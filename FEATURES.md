@@ -1,12 +1,12 @@
 # Windows feature inventory and Linux coverage
 
-**26 November 2026 · Drive Desk 0.3.1 · Debian 13 / GNOME**
+**26 November 2026 · Drive Desk 0.3.2 · Debian 13 / GNOME**
 
 This inventory covers publicly documented Windows desktop workflows, settings, Office integration and enterprise controls. The Windows installer previously inspected was Google-signed version 134.0.1.0. Undocumented behavior, rollout-specific UI, and organization-specific entitlements cannot be established from installer inspection. “Implemented” describes a code path. The verification section records where it has actually run.
 
 | Windows capability | Drive Desk 0.2 behavior | Coverage |
 |---|---|---|
-| Browser sign-in, several accounts (Windows supports four), switch and disconnect | GNOME Online Accounts owns authentication. The selector assigns search and sync to a specific account. Removing access prevents future transfers. | Integrated; live sign-in unverified |
+| Browser sign-in, several accounts (Windows supports four), switch and disconnect | GNOME Online Accounts owns authentication. The selector assigns search and sync to a specific account. Removing access prevents future transfers. | Single-account sign-in and worker authentication verified live |
 | Explorer virtual drive and on-demand open, create, edit, rename, move, copy and delete | Open in Files uses GNOME’s GVfs Google backend. Applications can use the GVfs FUSE bridge. | Delegated; live semantics depend on backend and permissions |
 | Drive letter or custom streamed folder | Link to folder creates a Linux filesystem shortcut to the active mount. | Partial; GNOME chooses the mount path |
 | My Drive, Shared drives, Other computers and backed-up devices | Search includes accessible shared-drive items. Folder jobs carry the shared-drive ID. Files shows the collections exposed by GVfs. Local folder sync creates a named folder in My Drive. | Partial; Google’s Computers namespace and device identities unavailable here |
@@ -45,4 +45,6 @@ The platform-specific rows use Google’s [Office and Outlook guide](https://sup
 
 ## Verification boundary
 
-Tests in the Debian 13 VirtualBox guest exercise the packaged Linux dependencies, GTK, local GIO copies and actual rclone transfers between disposable directories. They cover initial replication, offline edit upload, deletion, two-sided conflicts in a folder mirror, selective file pinning, moved pins, backup retention and a replaced local root. API tests check requests using fixtures. Workspace permissions, real Google invitation delivery, Shared drives, high-volume sync, expiring credentials mid-transfer, USB hardware and end-to-end Google authentication remain unverified. These distinctions matter before assigning the app an important Drive.
+Tests in the Debian 13 VirtualBox guest exercise the packaged Linux dependencies, GTK, local GIO copies and actual rclone transfers between disposable directories. They cover initial replication, offline edit upload, deletion, two-sided conflicts in a folder mirror, selective file pinning, moved pins, backup retention and a replaced local root. API tests check requests using fixtures. Workspace permissions, real Google invitation delivery, Shared drives, high-volume sync, expiring credentials mid-transfer, and USB hardware remain unverified.
+
+A separate live test used a Files-enabled GNOME Google account and one selected Drive folder. Debian verified the Windows seed by SHA-256. With the VM network link down, Linux edited the file. After reconnection, the packaged user service synchronized the edit to the Windows desktop client. A subsequent Windows edit synchronized back to Debian. Both ends matched the expected bytes, including an unchanged control file. These distinctions matter before assigning the app an important Drive.

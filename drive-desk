@@ -331,6 +331,10 @@ def activate(app):
 
 if __name__ == "__main__":
     import sys
+    # Older GNOME sessions can keep their bus at a session-specific address
+    # until the next login after installing dbus-user-session.
+    if os.environ.get("DBUS_SESSION_BUS_ADDRESS") and not (Path(GLib.get_user_runtime_dir()) / "bus").exists():
+        subprocess.run(["systemctl", "--user", "import-environment", "DBUS_SESSION_BUS_ADDRESS"], check=False)
     app = Gtk.Application(application_id="io.github.drivedesk.Client",
                           flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
     def command_line(application, command):

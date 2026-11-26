@@ -1,14 +1,14 @@
-# Drive Desk 0.3.1
+# Drive Desk 0.3.2
 
 An independent MIT-licensed Google Drive client for Debian 13 with GNOME. Use Drive on demand in Files, or keep selected content on disk and synchronize offline edits. GNOME handles sign-in. The background worker uses Debian’s rclone package internally. Setup is graphical.
 
-**Preview release.** Automated tests cover local transfer behavior. Live Google round-trip verification is pending.
+**Preview release.** Automated tests cover local transfer behavior. A live test verified a Windows-created file in Debian, an offline Linux edit back on Windows, and a subsequent Windows edit back in Debian using one selected folder.
 
-[Download the Debian package and SHA-256 checksum](https://github.com/twosharprocks/drive-desk/releases/tag/v0.3.1).
+[Download the Debian package and SHA-256 checksum](https://github.com/twosharprocks/drive-desk/releases/tag/v0.3.2).
 
 ## Install and connect
 
-1. Open `drive-desk_0.3.1_all.deb` in the package installer, or run `sudo apt install ./drive-desk_0.3.1_all.deb`. This upgrades earlier versions in place. Close any open Drive Desk window before launching the new version.
+1. Open `drive-desk_0.3.2_all.deb` in the package installer, or run `sudo apt install ./drive-desk_0.3.2_all.deb`. This upgrades earlier versions in place. Close any open Drive Desk window before launching the new version.
 2. Open **Drive Desk → Online Accounts → Google**, sign in, and enable **Files**. Select that account in Drive Desk.
 3. Choose **Open in Files** for online access. **Link to folder** can place a shortcut to the GVfs mount elsewhere on disk. The link works while the account is mounted. The optional Nautilus extension appears in a new Files session.
 4. For a small first round trip, create a disposable Drive folder containing two text files. In **Search Drive**, select that folder, choose **Keep offline**, and pick an empty local directory. Wait for **Scheduled folders** to show **Up to date**. Edit one local file offline, reconnect, run the enabled jobs, and compare the file in Drive on the web. Check a change in the opposite direction too.
