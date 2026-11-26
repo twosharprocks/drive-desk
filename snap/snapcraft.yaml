@@ -1,0 +1,40 @@
+name: drive-desk
+base: core24
+version: '0.4.0'
+summary: Open Google Drive and synchronize selected folders on GNOME
+description: |
+  Drive Desk uses your GNOME Online Accounts login to access Google Drive.
+  Select individual folders for offline editing, search Drive, and manage sync jobs.
+grade: devel
+confinement: strict
+license: MIT
+icon: packaging/drive-desk.svg
+platforms:
+  amd64:
+
+slots:
+  desktop-session:
+    interface: dbus
+    bus: session
+    name: io.github.twosharprocks.DriveDesk.Snap
+
+apps:
+  drive-desk:
+    command: bin/start-drive-desk
+    autostart: drive-desk.desktop
+    desktop: usr/share/applications/drive-desk.desktop
+    extensions: [gnome]
+    plugs: [network, home, removable-media, accounts-service]
+    slots: [desktop-session]
+
+parts:
+  drive-desk:
+    plugin: nil
+    source: .
+    stage-packages: [rclone, libnotify-bin, gvfs, xdg-utils]
+    override-build: |
+      install -Dm755 drive-desk "$CRAFT_PART_INSTALL/share/drive-desk/drive-desk"
+      install -m644 cloud.py desktop_tools.py portable.py sync.py "$CRAFT_PART_INSTALL/share/drive-desk/"
+      install -Dm755 snap/launcher "$CRAFT_PART_INSTALL/bin/start-drive-desk"
+      install -Dm644 drive-desk.desktop "$CRAFT_PART_INSTALL/usr/share/applications/drive-desk.desktop"
+      install -Dm644 LICENSE "$CRAFT_PART_INSTALL/share/licenses/drive-desk/LICENSE"

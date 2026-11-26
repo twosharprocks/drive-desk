@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.twosharprocks.DriveDesk</id>
+  <name>Drive Desk</name>
+  <summary>Open Google Drive and sync selected folders on GNOME</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description><p>Use your GNOME Online Accounts login to browse Google Drive, search for files and keep selected folders available for offline editing.</p></description>
+  <launchable type="desktop-id">io.github.twosharprocks.DriveDesk.desktop</launchable>
+  <url type="homepage">https://github.com/twosharprocks/drive-desk</url>
+  <releases><release version="0.4.0" date="2026-11-26"/></releases>
+</component>

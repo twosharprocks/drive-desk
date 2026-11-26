@@ -1,17 +1,42 @@
-# Drive Desk 0.3.2
+# Drive Desk 0.4.0
 
-An independent MIT-licensed Google Drive client for Debian 13 with GNOME. Use Drive on demand in Files, or keep selected content on disk and synchronize offline edits. GNOME handles sign-in. The background worker uses Debian’s rclone package internally. Setup is graphical.
+An independent MIT-licensed Google Drive client for GNOME on Linux. Use Drive on demand in Files, or keep selected content on disk and synchronize offline edits. GNOME handles sign-in. The background worker uses rclone internally. Setup is graphical.
 
 **Preview release.** Automated tests cover local transfer behavior. A live test verified a Windows-created file in Debian, an offline Linux edit back on Windows, and a subsequent Windows edit back in Debian using one selected folder.
 
-[Download the Debian package and SHA-256 checksum](https://github.com/twosharprocks/drive-desk/releases/tag/v0.3.2).
+[Download the Flatpak, Snap or Debian package and SHA-256 checksums](https://github.com/twosharprocks/drive-desk/releases/tag/v0.4.0).
 
 ## Install and connect
 
-1. Open `drive-desk_0.3.2_all.deb` in the package installer, or run `sudo apt install ./drive-desk_0.3.2_all.deb`. This upgrades earlier versions in place. Close any open Drive Desk window before launching the new version.
-2. Open **Drive Desk → Online Accounts → Google**, sign in, and enable **Files**. Select that account in Drive Desk.
-3. Choose **Open in Files** for online access. **Link to folder** can place a shortcut to the GVfs mount elsewhere on disk. The link works while the account is mounted. The optional Nautilus extension appears in a new Files session.
-4. For a small first round trip, create a disposable Drive folder containing two text files. In **Search Drive**, select that folder, choose **Keep offline**, and pick an empty local directory. Wait for **Scheduled folders** to show **Up to date**. Edit one local file offline, reconnect, run the enabled jobs, and compare the file in Drive on the web. Check a change in the opposite direction too.
+Choose one format. The portable downloads support x86-64 Linux with GNOME Online Accounts and the GVfs Google backend installed on the host. Each format stores its jobs separately. If you switch formats, disconnect the old job before assigning the same folder to the new one.
+
+**Flatpak** (with Flatpak installed):
+
+```sh
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user ./DriveDesk-0.4.0-x86_64.flatpak
+flatpak run io.github.twosharprocks.DriveDesk//stable
+```
+
+Flathub supplies the GNOME 50 runtime. The Drive Desk installer comes from GitHub. Its sandbox has network and home-folder access for sync, removable mount access, and access to the desktop account and file services.
+
+**Snap** (with snapd installed):
+
+```sh
+sudo snap install --dangerous ./drive-desk_0.4.0_amd64.snap
+sudo snap connect drive-desk:accounts-service
+snap run drive-desk
+```
+
+The local installer uses strict confinement. Snap calls its local installation flag `--dangerous` because the GitHub download has no Snap Store assertion. The account connection allows the app to use your GNOME Google login. For external disks, also run `sudo snap connect drive-desk:removable-media`. The first install may download shared GNOME content snaps.
+
+**Debian 13**: Open `drive-desk_0.4.0_all.deb` in your package installer or run `sudo apt install ./drive-desk_0.4.0_all.deb`. Close any open Drive Desk window before upgrading.
+
+### Connect an account
+
+1. Open **Drive Desk → Online Accounts → Google**, sign in, and enable **Files**. Select that account in Drive Desk.
+2. Choose **Open in Files** for online access. **Link to folder** can place a shortcut to the GVfs mount elsewhere on disk. The link works while the account is mounted. The Debian package also supplies an optional host Nautilus extension. For either sandboxed package, you can access the same web and link actions in Drive Desk search.
+3. For a small first round trip, create a disposable Drive folder containing two text files. In **Search Drive**, select that folder, choose **Keep offline**, and pick an empty local directory. Wait for **Scheduled folders** to show **Up to date**. Edit one local file offline, reconnect, run the enabled jobs, and compare the file in Drive on the web. Check a change in the opposite direction too.
 
 ## Choose a sync mode
 
@@ -23,9 +48,9 @@ An independent MIT-licensed Google Drive client for Debian 13 with GNOME. Use Dr
 | Scheduled folders → Back up | Copies a local directory into My Drive / Drive Desk backups. Subsequent runs upload changes. Local deletions leave remote copies in place. |
 | Save an offline copy | Downloads an independent file once. Local edits stay local. The destination must support hard links. |
 
-Jobs run sequentially in a user systemd service about two minutes after the preceding run finishes. The scheduler keeps working after the window closes. An account must have Files enabled, and the session keyring must be accessible. Scheduled mirrors create a small hidden identity file on both sides. Keep it in place. First-time pinning or mirroring therefore requires write access to the selected folder or parent. Avoid overlapping cloud folder trees across jobs.
+Jobs run sequentially about two minutes after the preceding run finishes. Debian uses a user systemd service. Flatpak and Snap keep a background application instance while jobs are scheduled. For automatic startup after logout and sign-in, enable **Preferences → Start folder scheduler at sign-in** and accept the desktop background permission if prompted. The scheduler keeps working after the window closes. An account must have Files enabled, and the session keyring must be accessible. Scheduled mirrors create a small hidden identity file on both sides. Keep it in place. First-time pinning or mirroring therefore requires write access to the selected folder or parent. Avoid overlapping cloud folder trees across jobs.
 
-**Pause / Resume** on a folder changes the next run. **Pause all** also asks systemd to freeze an in-progress transfer. A long pause can cause a network timeout when resumed. **Disconnect** removes the job and retains local and cloud files. Online Accounts controls account access separately. Preferences can disable login scheduling. For removable media, a changed mount identity can require reconnecting the job.
+**Pause / Resume** on a folder changes the next run. **Pause all** can also suspend an in-progress transfer. A long pause can cause a network timeout when resumed. **Disconnect** removes the job and retains local and cloud files. Online Accounts controls account access separately. Preferences can disable login scheduling. For removable media, a changed mount identity can require reconnecting the job.
 
 **Search Drive** supports names and indexed content, paginated results, starring, trash/restore, link copying, browser opening, and sharing with a named email address. **Email link** starts a draft in your mail client. **Share and notify** requests an actual Drive permission grant and invitation. The selected account’s existing permissions apply.
 
@@ -43,7 +68,7 @@ Native Docs, Sheets, Slides and Drive shortcuts are excluded from scheduled bina
 
 ## Build and test
 
-On Debian, run `sh build-deb.sh` to build the package. With its runtime dependencies, Xvfb, xauth and dbus-daemon installed, run `python3 test_sync.py` followed by `NO_AT_BRIDGE=1 dbus-run-session -- xvfb-run -a python3 test_drive_desk.py`. The transfer tests use disposable local directories. No Google credentials are required. To remove the package, use the system package manager. To stop ongoing work first, pause or disconnect jobs in the app.
+Portable package build commands are in [the packaging guide](packaging/BUILD.md). On Debian, run `sh build-deb.sh` to build the package. With its runtime dependencies, Xvfb, xauth and dbus-daemon installed, run `python3 test_sync.py` followed by `NO_AT_BRIDGE=1 dbus-run-session -- xvfb-run -a python3 test_drive_desk.py`. The transfer tests use disposable local directories. No Google credentials are required. To remove the package, use the system package manager. To stop ongoing work first, pause or disconnect jobs in the app.
 
 ## Windows comparison baseline
 

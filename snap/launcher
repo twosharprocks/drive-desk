@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+export DRIVE_DESK_FORMAT=snap DRIVE_DESK_APP_ID=io.github.twosharprocks.DriveDesk.Snap
+export XDG_STATE_HOME="$SNAP_USER_COMMON/state"
+export PYTHONPATH="$SNAP/gnome-platform/usr/lib/python3/dist-packages:$SNAP/usr/lib/python3/dist-packages${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/bin/python3 "$SNAP/share/drive-desk/drive-desk" "$@"

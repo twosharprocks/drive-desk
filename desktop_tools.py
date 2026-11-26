@@ -9,6 +9,7 @@ from gi.repository import Gdk, GLib, Gtk
 
 import cloud
 import sync
+import portable
 
 
 def button(box, label, callback):
@@ -63,6 +64,10 @@ def timer(*args):
 
 
 def toggle_transfers():
+    if portable.enabled:
+        paused = sync.preference("paused") != "yes"
+        portable.scheduler.pause(paused)
+        return "Scheduled transfers paused." if paused else "Scheduled transfers resumed."
     service = "drive-desk-sync.service"
     if sync.preference("paused") == "yes":
         freezer = subprocess.run(["systemctl", "--user", "show", "-p", "FreezerState", "--value", service],
@@ -88,10 +93,14 @@ def preferences(parent):
     usb = Gtk.CheckButton(label="Offer to back up removable drives while Drive Desk is open")
     usb.set_active(sync.preference("usb") == "on")
     startup = Gtk.CheckButton(label="Start folder scheduler at sign-in")
-    enabled = subprocess.run(["systemctl", "--user", "is-enabled", "--quiet", "drive-desk-sync.timer"]).returncode == 0
+    if portable.enabled:
+        enabled = sync.preference("portable-login") == "on"
+    else:
+        enabled = subprocess.run(["systemctl", "--user", "is-enabled", "--quiet", "drive-desk-sync.timer"]).returncode == 0
     startup.set_active(enabled)
     keys = Gtk.Button(label="Open GNOME keyboard shortcuts…")
-    keys.connect("clicked", lambda *_: subprocess.Popen(["gnome-control-center", "keyboard"]))
+    keys.connect("clicked", lambda *_: portable.settings_panel("keyboard") if portable.enabled else
+                 subprocess.Popen(["gnome-control-center", "keyboard"]))
     if prompt(parent, "Save preferences", [("Proxy for scheduled transfers", proxy),
             ("Notifications", notes), ("Connected devices", usb), ("Background sync", startup),
             ("For a global search shortcut, assign the command drive-desk --search.", keys)]):
@@ -99,11 +108,22 @@ def preferences(parent):
         sync.configure("notifications", "on" if notes.get_active() else "off")
         sync.configure("usb", "on" if usb.get_active() else "off")
         if startup.get_active() != enabled:
-            timer("enable" if startup.get_active() else "disable", "--now", "drive-desk-sync.timer")
+            if portable.enabled:
+                portable.login_start(startup.get_active(), lambda value:
+                                     sync.configure("portable-login", "on" if value else "off"))
+            else:
+                timer("enable" if startup.get_active() else "disable", "--now", "drive-desk-sync.timer")
 
 
 def schedule(parent, account, kind, remote="root", name="My Drive", team="", local_start=None, pin=None):
-    chooser = Gtk.FileChooserButton.new("Local folder", Gtk.FileChooserAction.SELECT_FOLDER)
+    if portable.enabled:
+        # The worker needs a persistent filesystem path, including after logout.
+        folder_dialog = Gtk.FileChooserDialog(title="Local folder", transient_for=parent,
+                                              action=Gtk.FileChooserAction.SELECT_FOLDER)
+        folder_dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Select", Gtk.ResponseType.ACCEPT)
+        chooser = Gtk.FileChooserButton.new_with_dialog(folder_dialog)
+    else:
+        chooser = Gtk.FileChooserButton.new("Local folder", Gtk.FileChooserAction.SELECT_FOLDER)
     chooser.set_local_only(True)
     if local_start:
         chooser.set_filename(local_start)
@@ -119,10 +139,15 @@ def schedule(parent, account, kind, remote="root", name="My Drive", team="", loc
         return ""
     if not chooser.get_filename():
         raise ValueError("Select a local folder.")
-    timer("enable", "--now", "drive-desk-sync.timer")
+    if not portable.enabled:
+        timer("enable", "--now", "drive-desk-sync.timer")
     key = sync.add_job(account, kind, chooser.get_filename(), remote, name, team,
                        up.get_value_as_int(), down.get_value_as_int(), pin)
-    timer("start", "--no-block", "drive-desk-sync.service")
+    if portable.enabled:
+        portable.scheduler.enable(portable.scheduler.app)
+        portable.scheduler.start()
+    else:
+        timer("start", "--no-block", "drive-desk-sync.service")
     return key
 
 
@@ -193,9 +218,15 @@ class Jobs(Gtk.Window):
             elif action == "run" and sync.preference("paused") == "yes":
                 raise ValueError("Resume all scheduled transfers first.")
             elif action == "run":
-                timer("start", "--no-block", "drive-desk-sync.service")
+                if portable.enabled:
+                    portable.scheduler.start()
+                else:
+                    timer("start", "--no-block", "drive-desk-sync.service")
             elif action == "open":
-                subprocess.Popen(["nautilus", job["folder"]])
+                if portable.enabled:
+                    portable.open_folder(Path(job["folder"]).as_uri())
+                else:
+                    subprocess.Popen(["nautilus", job["folder"]])
             elif action == "storage":
                 def inspect():
                     local = subprocess.run(["du", "-sx", "--block-size=1", "--", job["folder"]],

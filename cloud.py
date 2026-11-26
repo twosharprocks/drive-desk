@@ -4,18 +4,32 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode, quote
 from urllib.request import Request, urlopen
 
-import gi
-gi.require_version("Goa", "1.0")
-from gi.repository import Goa
+from gi.repository import Gio
+
+GOA = "org.gnome.OnlineAccounts"
+
+
+def account_manager():
+    return Gio.DBusObjectManagerClient.new_for_bus_sync(
+        Gio.BusType.SESSION, Gio.DBusObjectManagerClientFlags.NONE, GOA,
+        "/org/gnome/OnlineAccounts", None, None, None)
+
+
+def google_accounts(manager):
+    for obj in manager.get_objects():
+        account = obj.get_interface(GOA + ".Account")
+        files = obj.get_interface(GOA + ".Files")
+        if account and files and account.get_cached_property("ProviderType").unpack() == "google":
+            yield (account.get_cached_property("Id").unpack(),
+                   account.get_cached_property("PresentationIdentity").unpack(),
+                   files.get_cached_property("Uri").unpack(), obj)
 
 
 def token_for(account_id):
-    client = Goa.Client.new_sync(None)
-    for obj in client.get_accounts():
-        account = obj.get_account()
-        if account.props.id == account_id and account.props.provider_type == "google" and obj.get_files():
-            token, _ = obj.get_oauth2_based().call_get_access_token_sync(None)
-            return token
+    for ident, _, _, obj in google_accounts(account_manager()):
+        if ident == account_id:
+            oauth = obj.get_interface(GOA + ".OAuth2Based")
+            return oauth.call_sync("GetAccessToken", None, Gio.DBusCallFlags.NONE, 60000, None).unpack()[0]
     raise ValueError("Reconnect this Google account and enable Files in Online Accounts.")
 
 

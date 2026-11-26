@@ -8,8 +8,9 @@ from pathlib import Path
 
 import gi
 gi.require_version("Gtk", "3.0")
-gi.require_version("Goa", "1.0")
-from gi.repository import Gio, GLib, Goa, Gtk
+from gi.repository import Gio, GLib, Gtk
+import cloud
+import portable
 from desktop_tools import Jobs, Search, button, history, preferences, schedule, toggle_transfers
 import sync
 
@@ -125,7 +126,7 @@ class Window(Gtk.ApplicationWindow):
     def preferences(self, *_):
         try:
             preferences(self)
-        except (ValueError, OSError) as exc:
+        except (ValueError, OSError, GLib.Error) as exc:
             self.status.set_text(str(exc))
 
     def device_added(self, monitor, mount):
@@ -197,17 +198,15 @@ class Window(Gtk.ApplicationWindow):
         self.accounts.remove_all()
         try:
             if self.client is None:
-                self.client = Goa.Client.new_sync(None)
-                for event in ("account-added", "account-removed", "account-changed"):
+                self.client = cloud.account_manager()
+                for event in ("object-added", "object-removed", "interface-added", "interface-removed", "interface-proxy-properties-changed"):
                     self.client.connect(event, self.refresh)
             rows = []
             self.account_ids.clear()
-            for obj in self.client.get_accounts():
-                account = obj.get_account()
-                files = obj.get_files()
-                if account.props.provider_type == "google" and files and files.props.uri:
-                    rows.append((files.props.uri, account.props.presentation_identity))
-                    self.account_ids[files.props.uri] = account.props.id
+            for ident, label, uri, _ in cloud.google_accounts(self.client):
+                if uri:
+                    rows.append((uri, label))
+                    self.account_ids[uri] = ident
             for uri, label in sorted(rows, key=lambda item: item[1]):
                 self.accounts.append(uri, label)
             if rows and not (previous and self.accounts.set_active_id(previous)):
@@ -225,6 +224,9 @@ class Window(Gtk.ApplicationWindow):
         self.actions.set_sensitive(bool(self.accounts.get_active_id()) and self.cancel is None)
 
     def settings(self, *_):
+        if portable.enabled:
+            self.status.set_text(portable.settings_panel("online-accounts"))
+            return
         try:
             subprocess.Popen(["gnome-control-center", "online-accounts"])
         except OSError as exc:
@@ -232,6 +234,13 @@ class Window(Gtk.ApplicationWindow):
 
     def mount(self, copying):
         root = Gio.File.new_for_uri(self.accounts.get_active_id())
+        if portable.enabled and not copying:
+            try:
+                portable.open_folder(root.get_uri())
+                self.status.set_text("Opened in Files.")
+            except GLib.Error as exc:
+                self.status.set_text(exc.message)
+            return
         self.cancel = Gio.Cancellable()
         self.controls()
         self.status.set_text("Connecting to Drive…")
@@ -333,14 +342,19 @@ if __name__ == "__main__":
     import sys
     # Older GNOME sessions can keep their bus at a session-specific address
     # until the next login after installing dbus-user-session.
-    if os.environ.get("DBUS_SESSION_BUS_ADDRESS") and not (Path(GLib.get_user_runtime_dir()) / "bus").exists():
+    if not portable.enabled and os.environ.get("DBUS_SESSION_BUS_ADDRESS") and not (Path(GLib.get_user_runtime_dir()) / "bus").exists():
         subprocess.run(["systemctl", "--user", "import-environment", "DBUS_SESSION_BUS_ADDRESS"], check=False)
-    app = Gtk.Application(application_id="io.github.drivedesk.Client",
+    app = Gtk.Application(application_id=os.environ.get("DRIVE_DESK_APP_ID", "io.github.drivedesk.Client"),
                           flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+    if portable.enabled:
+        app.connect("startup", portable.scheduler.startup)
     def command_line(application, command):
+        args = command.get_arguments()[1:]
+        if portable.enabled and "--background" in args:
+            portable.scheduler.enable(application)
+            return 0
         application.activate()
         win = application.get_active_window()
-        args = command.get_arguments()[1:]
         if "--search" in args:
             win.search()
         elif "--folders" in args:

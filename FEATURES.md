@@ -1,6 +1,6 @@
 # Windows feature inventory and Linux coverage
 
-**26 November 2026 · Drive Desk 0.3.2 · Debian 13 / GNOME**
+**26 November 2026 · Drive Desk 0.4.0 · Debian 13 / GNOME**
 
 This inventory covers publicly documented Windows desktop workflows, settings, Office integration and enterprise controls. The Windows installer previously inspected was Google-signed version 134.0.1.0. Undocumented behavior, rollout-specific UI, and organization-specific entitlements cannot be established from installer inspection. “Implemented” describes a code path. The verification section records where it has actually run.
 

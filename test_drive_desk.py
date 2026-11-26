@@ -11,6 +11,27 @@ Gio, GLib, Gtk = (app[name] for name in ("Gio", "GLib", "Gtk"))
 
 
 class DriveTests(unittest.TestCase):
+    def test_portable_worker_lifetime(self):
+        import portable
+        import sync
+        scheduler = portable.Scheduler()
+        app = mock.Mock()
+        scheduler.app = app
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, XDG_STATE_HOME=tmp), \
+                mock.patch.object(portable.subprocess, "Popen") as spawn:
+            scheduler.enable(app)
+            scheduler.enable(app)
+            app.hold.assert_called_once()
+            with sync.database() as db:
+                db.execute("INSERT INTO jobs(id) VALUES('test')")
+            scheduler.tick()
+            spawn.assert_called_once()
+            scheduler.disable()
+            app.release.assert_not_called()
+            spawn.return_value.poll.return_value = 0
+            scheduler.tick()
+            app.release.assert_called_once()
+
     def test_copy(self):
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
@@ -32,7 +53,7 @@ class DriveTests(unittest.TestCase):
             self.assertEqual(set(folder.iterdir()), {src, dst})
 
     def test_window(self):
-        application = Gtk.Application(application_id="org.example.DriveDeskTest")
+        application = Gtk.Application(application_id=os.getenv("DRIVE_DESK_APP_ID", "org.example.DriveDeskTest"))
         application.register(None)
         window = app["Window"](application)
         self.assertIsNotNone(window.client)
