@@ -1,0 +1,7 @@
+[Unit]
+Description=Sync Drive Desk folders
+
+[Service]
+Type=exec
+UMask=0077
+ExecStart=/usr/bin/python3 /usr/share/drive-desk/sync.py

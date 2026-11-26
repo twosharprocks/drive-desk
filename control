@@ -1,0 +1,11 @@
+Package: drive-desk
+Version: 0.3.1
+Section: net
+Priority: optional
+Architecture: all
+Maintainer: Drive Desk contributors <drive-desk@example.invalid>
+Depends: python3, python3-gi, gir1.2-gtk-3.0, gir1.2-gtk-4.0, gir1.2-goa-1.0, gnome-online-accounts, gnome-control-center, gvfs-backends, nautilus, gnome-keyring, rclone (>= 1.60), systemd, libnotify-bin, xdg-utils
+Recommends: gvfs-fuse, python3-nautilus, gir1.2-ayatanaappindicator3-0.1
+Description: Open Google Drive accounts in GNOME Files
+ Uses GNOME Online Accounts for sign-in and GVfs for on-demand access.
+ Supports scheduled folder mirrors, backups, cloud search and sharing.

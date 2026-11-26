@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Drive Desk folders while signed in
+
+[Timer]
+OnStartupSec=30s
+OnUnitInactiveSec=2min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target

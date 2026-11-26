@@ -1,0 +1,347 @@
+#!/usr/bin/python3
+"""Drive Desk — open a Google Drive account in the GNOME desktop."""
+import os
+import subprocess
+import tempfile
+import threading
+from pathlib import Path
+
+import gi
+gi.require_version("Gtk", "3.0")
+gi.require_version("Goa", "1.0")
+from gi.repository import Gio, GLib, Goa, Gtk
+from desktop_tools import Jobs, Search, button, history, preferences, schedule, toggle_transfers
+import sync
+
+
+def save_copy(source, target, cancel):
+    """Publish a complete copy without replacing an existing local file."""
+    with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".drive-desk-") as temp:
+        stream = source.read(cancel)
+        try:
+            while True:
+                block = stream.read_bytes(1024 * 1024, cancel).get_data()
+                if not block:
+                    break
+                temp.write(block)
+            temp.flush()
+            os.fsync(temp.fileno())
+        finally:
+            stream.close(None)
+        cancel.set_error_if_cancelled()
+        os.link(temp.name, target)
+
+
+class Window(Gtk.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Drive Desk")
+        self.set_default_size(500, 265)
+        self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12, margin=20)
+        self.add(self.box)
+        heading = Gtk.Label(xalign=0)
+        heading.set_markup('<span size="x-large" weight="bold">Google Drive</span>')
+        self.box.pack_start(heading, False, False, 0)
+        self.accounts = Gtk.ComboBoxText()
+        self.box.pack_start(self.accounts, False, False, 0)
+        self.actions = Gtk.Box(spacing=8)
+        self.box.pack_start(self.actions, False, False, 0)
+        self.button("Open in Files", lambda *_: self.mount(False))
+        self.button("Save an offline copy…", lambda *_: self.mount(True))
+        self.button("Search Drive…", lambda *_: self.search())
+        self.button("Link to folder…", lambda *_: self.mount("shortcut"))
+        self.status = Gtk.Label(xalign=0, wrap=True, selectable=True)
+        self.box.pack_start(self.status, True, True, 0)
+        self.summary = Gtk.Label(xalign=0, wrap=True)
+        self.box.pack_start(self.summary, False, False, 0)
+        activity = Gtk.Box(spacing=8)
+        self.box.pack_start(activity, False, False, 0)
+        self.activity_button = button(activity, "Sync activity", lambda: self.show_history(False))
+        self.notes_button = button(activity, "Notifications", lambda: self.show_history(True))
+        self.pause_button = button(activity, "Pause all transfers", self.toggle_sync)
+        footer = Gtk.Box(spacing=8)
+        self.box.pack_end(footer, False, False, 0)
+        settings = Gtk.Button(label="Online Accounts…")
+        settings.connect("clicked", self.settings)
+        footer.pack_start(settings, False, False, 0)
+        jobs = Gtk.Button(label="Scheduled folders…")
+        jobs.connect("clicked", lambda *_: Jobs(self, self.account_ids.get(self.accounts.get_active_id())))
+        footer.pack_start(jobs, False, False, 0)
+        prefs = Gtk.Button(label="Preferences…")
+        prefs.connect("clicked", self.preferences)
+        footer.pack_start(prefs, False, False, 0)
+        self.stop = Gtk.Button(label="Cancel")
+        self.stop.connect("clicked", lambda *_: self.cancel.cancel() if self.cancel else None)
+        footer.pack_end(self.stop, False, False, 0)
+        self.cancel = None
+        self.client = None
+        self.account_ids = {}
+        app.set_accels_for_action("win.search", ["<Primary>f"])
+        search_action = Gio.SimpleAction.new("search", None)
+        search_action.connect("activate", lambda *_: self.search())
+        self.add_action(search_action)
+        self.monitor = Gio.VolumeMonitor.get()
+        listener = self.monitor.connect("mount-added", self.device_added)
+        self.connect("destroy", lambda *_: self.monitor.disconnect(listener))
+        self.connect("delete-event", self.closing)
+        self.show_all()
+        self.refresh()
+        self.accounts.connect("changed", lambda *_: self.update_summary())
+        self.update_summary()
+        source = GLib.timeout_add_seconds(3, self.retry_service)
+        self.connect("destroy", lambda *_: GLib.source_remove(source))
+        self.indicator = self.make_indicator()
+
+    def make_indicator(self):
+        try:
+            gi.require_version("AyatanaAppIndicator3", "0.1")
+            from gi.repository import AyatanaAppIndicator3 as Indicator
+        except (ImportError, ValueError):
+            return None
+        indicator = Indicator.Indicator.new("drive-desk", "folder-remote",
+                                            Indicator.IndicatorCategory.APPLICATION_STATUS)
+        menu = Gtk.Menu()
+        for label, action in [("Open Drive Desk", self.present), ("Search Drive", self.search),
+                ("Scheduled folders", lambda: Jobs(self, self.account_ids.get(self.accounts.get_active_id()))),
+                ("Quit window", self.close)]:
+            item = Gtk.MenuItem(label=label)
+            item.connect("activate", lambda _, callback=action: callback())
+            menu.append(item)
+        menu.show_all()
+        indicator.set_menu(menu)
+        indicator.set_status(Indicator.IndicatorStatus.ACTIVE)
+        return indicator
+
+    def button(self, label, action):
+        button = Gtk.Button(label=label)
+        button.connect("clicked", action)
+        self.actions.pack_start(button, False, False, 0)
+        return button
+
+    def search(self):
+        account = self.account_ids.get(self.accounts.get_active_id())
+        if account:
+            Search(self, account)
+
+    def preferences(self, *_):
+        try:
+            preferences(self)
+        except (ValueError, OSError) as exc:
+            self.status.set_text(str(exc))
+
+    def device_added(self, monitor, mount):
+        drive = mount.get_drive()
+        device = mount.get_uuid()
+        path = mount.get_root().get_path()
+        account = self.account_ids.get(self.accounts.get_active_id())
+        if not (drive and drive.is_removable() and path and device and account):
+            return
+        if sync.preference("usb") != "on" or sync.preference("ignore-" + device):
+            return
+        dialog = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
+                                   text="Back up files from " + mount.get_name() + "?")
+        dialog.add_buttons("Ignore this device", 1, "Later", 2, "Choose backup folder…", 3)
+        response = dialog.run()
+        dialog.destroy()
+        if response == 1:
+            sync.configure("ignore-" + device, "on")
+        elif response == 3:
+            try:
+                schedule(self, account, "backup", local_start=path)
+            except (OSError, ValueError) as exc:
+                self.status.set_text(str(exc))
+
+    def retry_service(self):
+        if self.client is None:
+            self.refresh()
+        self.update_summary()
+        return True
+
+    def show_history(self, notifications):
+        history(self, self.account_ids.get(self.accounts.get_active_id()), notifications)
+        self.update_summary()
+
+    def toggle_sync(self):
+        try:
+            self.status.set_text(toggle_transfers())
+        except (OSError, ValueError) as exc:
+            self.status.set_text(str(exc))
+        self.update_summary()
+
+    def update_summary(self):
+        account = self.account_ids.get(self.accounts.get_active_id())
+        with sync.database() as db:
+            jobs = db.execute("SELECT status,paused FROM jobs WHERE account=?", (account,)).fetchall()
+            unread = db.execute("SELECT COUNT(*) FROM activity WHERE account=? AND unread=1", (account,)).fetchone()[0]
+        self.activity_button.set_sensitive(bool(account))
+        self.notes_button.set_sensitive(bool(account))
+        self.notes_button.set_label(f"Notifications ({unread})")
+        paused = sync.preference("paused") == "yes"
+        self.pause_button.set_label("Resume all transfers" if paused else "Pause all transfers")
+        self.pause_button.set_sensitive(bool(jobs) or paused)
+        counts = {}
+        for job in jobs:
+            status = job["status"]
+            category = ("running" if status == "Running" else "needs attention" if status.startswith("Needs attention")
+                        else "paused" if job["paused"] else "up to date" if status == "Up to date" else "pending")
+            counts[category] = counts.get(category, 0) + 1
+        if paused:
+            message = "Scheduled transfers are paused."
+        elif counts:
+            message = "Scheduled folders · " + ", ".join(f"{n} {label}" for label, n in counts.items())
+        else:
+            message = "No scheduled transfers for this account." if account else ""
+        self.summary.set_text(message)
+
+    def refresh(self, *_):
+        previous = self.accounts.get_active_id()
+        self.accounts.remove_all()
+        try:
+            if self.client is None:
+                self.client = Goa.Client.new_sync(None)
+                for event in ("account-added", "account-removed", "account-changed"):
+                    self.client.connect(event, self.refresh)
+            rows = []
+            self.account_ids.clear()
+            for obj in self.client.get_accounts():
+                account = obj.get_account()
+                files = obj.get_files()
+                if account.props.provider_type == "google" and files and files.props.uri:
+                    rows.append((files.props.uri, account.props.presentation_identity))
+                    self.account_ids[files.props.uri] = account.props.id
+            for uri, label in sorted(rows, key=lambda item: item[1]):
+                self.accounts.append(uri, label)
+            if rows and not (previous and self.accounts.set_active_id(previous)):
+                self.accounts.set_active(0)
+            if not self.cancel:
+                self.status.set_text("Files are available while connected." if rows else
+                                     "Open Online Accounts, add Google, and enable Files.")
+        except GLib.Error as exc:
+            self.status.set_text(f"Online Accounts is unavailable. {exc.message}")
+        self.controls()
+
+    def controls(self):
+        self.stop.set_visible(self.cancel is not None)
+        self.accounts.set_sensitive(self.cancel is None)
+        self.actions.set_sensitive(bool(self.accounts.get_active_id()) and self.cancel is None)
+
+    def settings(self, *_):
+        try:
+            subprocess.Popen(["gnome-control-center", "online-accounts"])
+        except OSError as exc:
+            self.status.set_text(str(exc))
+
+    def mount(self, copying):
+        root = Gio.File.new_for_uri(self.accounts.get_active_id())
+        self.cancel = Gio.Cancellable()
+        self.controls()
+        self.status.set_text("Connecting to Drive…")
+        root.mount_enclosing_volume(Gio.MountMountFlags.NONE, Gtk.MountOperation.new(self),
+                                    self.cancel, self.mounted, copying)
+
+    def mounted(self, root, result, copying):
+        try:
+            root.mount_enclosing_volume_finish(result)
+        except GLib.Error as exc:
+            if not exc.matches(Gio.io_error_quark(), Gio.IOErrorEnum.ALREADY_MOUNTED):
+                self.finish(exc.message)
+                return
+        try:
+            if copying == "shortcut":
+                target = root.get_path()
+                if not target:
+                    self.finish("A filesystem path is unavailable. Install gvfs-fuse and sign in again.")
+                    return
+                chooser = Gtk.FileChooserDialog(title="Place a shortcut to this Drive", transient_for=self,
+                                                action=Gtk.FileChooserAction.SAVE)
+                chooser.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Create shortcut", Gtk.ResponseType.OK)
+                chooser.set_local_only(True)
+                chooser.set_current_name("Google Drive")
+                path = chooser.get_filename() if chooser.run() == Gtk.ResponseType.OK else None
+                chooser.destroy()
+                if path:
+                    os.symlink(target, path, target_is_directory=True)
+                self.finish("Folder shortcut created." if path else "Cancelled.")
+            elif copying:
+                self.choose_copy(root)
+            else:
+                subprocess.Popen(["nautilus", root.get_uri()])
+                self.finish("Opened in Files.")
+        except (OSError, GLib.Error) as exc:
+            self.finish(str(exc))
+
+    def choose_copy(self, root):
+        chooser = Gtk.FileChooserDialog(title="Select a Drive file", transient_for=self,
+                                        action=Gtk.FileChooserAction.OPEN)
+        chooser.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Select", Gtk.ResponseType.OK)
+        chooser.set_local_only(False)
+        chooser.set_current_folder_uri(root.get_uri())
+        source = chooser.get_file() if chooser.run() == Gtk.ResponseType.OK else None
+        chooser.destroy()
+        if source is None or not source.has_prefix(root):
+            self.finish("Select a file inside the chosen Drive to save a copy.")
+            return
+        info = source.query_info("standard::display-name,standard::type",
+                                 Gio.FileQueryInfoFlags.NONE, self.cancel)
+        if info.get_file_type() != Gio.FileType.REGULAR:
+            self.finish("Choose an individual downloadable file.")
+            return
+        dest = Gtk.FileChooserDialog(title="Save independent offline copy", transient_for=self,
+                                     action=Gtk.FileChooserAction.SAVE)
+        dest.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Save copy", Gtk.ResponseType.OK)
+        dest.set_local_only(True)
+        name = info.get_display_name().replace("/", "_")
+        dest.set_current_name(name if name not in (".", "..", "") else "Drive file")
+        target = dest.get_filename() if dest.run() == Gtk.ResponseType.OK else None
+        dest.destroy()
+        if target is None:
+            self.finish("Copy cancelled.")
+            return
+        self.status.set_text("Downloading an independent copy…")
+        threading.Thread(target=self.download, args=(source, Path(target), self.cancel),
+                         daemon=False).start()
+
+    def download(self, source, target, cancel):
+        try:
+            save_copy(source, target, cancel)
+            message = f"Saved to {target}. Local edits stay in this copy."
+        except FileExistsError:
+            message = "A file already has that name. Choose a new name."
+        except (GLib.Error, OSError) as exc:
+            message = f"Could not save the copy. {exc}"
+        GLib.idle_add(self.finish, message)
+
+    def finish(self, message):
+        self.cancel = None
+        self.controls()
+        self.status.set_text(message)
+        return False
+
+    def closing(self, *_):
+        if self.cancel:
+            self.cancel.cancel()
+            self.status.set_text("Cancelling…")
+            return True
+        return False
+
+
+def activate(app):
+    window = app.get_active_window() or Window(app)
+    window.present()
+
+
+if __name__ == "__main__":
+    import sys
+    app = Gtk.Application(application_id="io.github.drivedesk.Client",
+                          flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
+    def command_line(application, command):
+        application.activate()
+        win = application.get_active_window()
+        args = command.get_arguments()[1:]
+        if "--search" in args:
+            win.search()
+        elif "--folders" in args:
+            Jobs(win, win.account_ids.get(win.accounts.get_active_id()))
+        return 0
+    app.connect("command-line", command_line)
+    app.connect("activate", activate)
+    raise SystemExit(app.run(sys.argv))

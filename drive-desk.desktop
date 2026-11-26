@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Name=Drive Desk
+GenericName=Google Drive desktop client
+Comment=Open, search and sync Google Drive files
+Exec=drive-desk
+Icon=folder-remote
+Terminal=false
+Categories=Network;FileTransfer;
+Keywords=Google;Drive;Cloud;
+Actions=Search;Folders;
+
+[Desktop Action Search]
+Name=Search Google Drive
+Exec=drive-desk --search
+
+[Desktop Action Folders]
+Name=Scheduled folders
+Exec=drive-desk --folders

@@ -1,0 +1,48 @@
+# Windows feature inventory and Linux coverage
+
+**26 November 2026 · Drive Desk 0.3.1 · Debian 13 / GNOME**
+
+This inventory covers publicly documented Windows desktop workflows, settings, Office integration and enterprise controls. The Windows installer previously inspected was Google-signed version 134.0.1.0. Undocumented behavior, rollout-specific UI, and organization-specific entitlements cannot be established from installer inspection. “Implemented” describes a code path. The verification section records where it has actually run.
+
+| Windows capability | Drive Desk 0.2 behavior | Coverage |
+|---|---|---|
+| Browser sign-in, several accounts (Windows supports four), switch and disconnect | GNOME Online Accounts owns authentication. The selector assigns search and sync to a specific account. Removing access prevents future transfers. | Integrated; live sign-in unverified |
+| Explorer virtual drive and on-demand open, create, edit, rename, move, copy and delete | Open in Files uses GNOME’s GVfs Google backend. Applications can use the GVfs FUSE bridge. | Delegated; live semantics depend on backend and permissions |
+| Drive letter or custom streamed folder | Link to folder creates a Linux filesystem shortcut to the active mount. | Partial; GNOME chooses the mount path |
+| My Drive, Shared drives, Other computers and backed-up devices | Search includes accessible shared-drive items. Folder jobs carry the shared-drive ID. Files shows the collections exposed by GVfs. Local folder sync creates a named folder in My Drive. | Partial; Google’s Computers namespace and device identities unavailable here |
+| Mirror My Drive and choose the local location | The scheduler seeds and verifies an empty folder, then runs two-way reconciliation. The local data remains usable when the app is closed. | Implemented for ordinary files; native Google items and shortcuts excluded |
+| Change between stream and mirror and merge a pre-existing local tree | Stream access and a mirror can coexist. Disconnect retains the local tree. Existing local folders have a separate two-way setup. | Partial; no automatic in-place mode migration |
+| Keep selected streamed files or folders offline, upload offline edits, return to online-only | Search → Keep offline creates a file pin or folder mirror. Disconnect stops synchronization and retains the local files. | Partial; separate local folder, writable cloud parent required, no transparent same-path eviction |
+| Continue work offline and resolve concurrent edits | Subsequent successful runs reconcile edits. Folder conflict tests retained both versions. A moved, replaced or ambiguous pin stops for review. | Implemented for scheduled folders; no Office merge dialog |
+| Two-way sync of local folders, including files added and deleted on either side | Sync local folder creates a two-way folder under My Drive / Drive Desk computers. Back up is a separate upload-only option. | Implemented with different cloud placement |
+| Removable drive and camera backup prompts, remember ignored devices | Optional prompts for mounted removable volumes with identifiers. Backup uses the selected local folder. Missing or replaced roots stop the worker. | Partial; app window must be running; camera protocols and device reidentification unverified |
+| Google Docs, Sheets, Slides and Drive shortcuts | Cloud results open in the web browser. GNOME handles streamed items. Native Google file types and shortcuts are excluded from ordinary-file replication. Browser offline support is separate. | Partial; no desktop placeholder generation in mirrors |
+| Desktop search, including content beyond local filenames | Search uses Drive full-text queries and paginated results. Views include Recent, Shared with me, Starred and Trash. | Implemented; live search coverage unverified |
+| Search shortcut and quick launch | Ctrl+F in Drive Desk. GNOME can bind a global shortcut to drive-desk --search. | Implemented with system-managed global binding |
+| Share, copy a Drive link and open on the web | Search can grant reader, commenter or writer access and send an invitation. Copy link preserves current permissions. The Files extension adds web and link actions on streamed items. | Partial; advanced sharing settings use Drive on the web |
+| Trash, restore, and recover a conflicting or unsynced version | Search can trash and restore items. Mirror transfers request Drive trash and keep conflict files under the sync engine’s rules. Local folder disconnect preserves data. | Partial; no equivalent of Google’s dedicated Lost & Found |
+| Tray, homepage, active transfers, recent sync history and notifications | Home shows scheduled-folder status, pause/resume, account activity and unread error counts. Jobs retains the two most recent transfer logs. Desktop error notifications and a tray indicator are available. | Partial; no complete per-file status badge or live ETA |
+| Pause, resume, quit, run at sign-in | User timer continues after closing the window. Per-job pause applies after the current run. Global pause stops scheduled jobs and requests a freeze of an active service; resume thaws it. Preferences controls login scheduling. | Partial; GVfs reads and writes from other apps continue |
+| Upload/download bandwidth and automatic/direct proxy | Independent upload/download caps for each scheduled job. Workers inherit proxy environment settings or use direct mode. | Partial; controls do not throttle or reconfigure GVfs |
+| Offline-file inventory, local disk and cloud storage usage | Jobs lists offline folders and pins. Storage reports folder usage, free local space and available Google quota information. | Partial; GVfs streaming cache is outside this accounting |
+| Streaming cache location, eviction, size limits and queued offline writes | Mirror/pin storage can be placed in a chosen local folder. | Gap in transparent streamed-file cache controls and writeback |
+| Work with .docx, .xlsx and .pptx | Files in a mirror open in the installed Linux office applications. Changes use ordinary file sync. | Implemented at file level |
+| Office real-time presence, safe/wait-to-edit notifications, identify collaborators, get latest and compare versions | Requires compatible Office host integration and a presence service. | Gap |
+| Outlook insert Drive links, check recipient access and save attachments into Drive | Email link opens the configured mail composer. A user can save attachments into a mirror using their mail client. | Partial workflow; Outlook add-in and recipient checks absent |
+| Enterprise deployment, account restrictions, trusted devices, cache limits, certificates, admin-enforced features and branded update delivery | Debian installation and removal are available. Google still authorizes each API call. | Gap in official-client enrollment, policy compatibility, managed updates and client-side-encrypted Workspace workflows |
+| Diagnostics, feedback and support | Activity displays recent transfer logs; package and source include tests and this inventory. | Partial; no upload to Google support or automatic diagnostic bundle |
+| Google Photos backup and quality selection | Google ended Drive for desktop Photos backup on 10 August 2026. Uploading images to Drive stores ordinary Drive files. | Retired Windows feature |
+
+## Direct observation on the Windows test host
+
+The signed-in Windows 134.0.1.0 client had a Google Drive volume at G:. Its Home window exposed Pause syncing, Open Drive folder, Sync activity, Notifications with an unread count, Add more folders to sync and offline help. Home reported that files were up to date. A later observation showed an informational notification about diagnostic reporting. Drive Desk records local transfer outcomes and errors. The Windows Ask Gemini entry point is a remaining difference. This inspection did not exercise uploads, offline edits or conflict resolution on the live Google account.
+
+## Evidence
+
+The end-user workflows and settings above come from Google’s [desktop guide](https://support.google.com/drive/answer/10838124), [redesigned client guide](https://support.google.com/drive/answer/16035364), [streaming and mirroring guide](https://support.google.com/drive/answer/13401938), [offline guide](https://support.google.com/drive/answer/2375012), [preferences](https://support.google.com/drive/answer/13470231) and [advanced guide](https://support.google.com/drive/answer/16631477).
+
+The platform-specific rows use Google’s [Office and Outlook guide](https://support.google.com/drive/answer/9406611), [recovery guide](https://support.google.com/drive/answer/2565956), [administrator configuration reference](https://knowledge.workspace.google.com/admin/drive/advanced-drive-for-desktop-configuration), [encryption guidance](https://support.google.com/drive/answer/10519333) and [Photos transition notice](https://support.google.com/photos/answer/6193313).
+
+## Verification boundary
+
+Tests in the Debian 13 VirtualBox guest exercise the packaged Linux dependencies, GTK, local GIO copies and actual rclone transfers between disposable directories. They cover initial replication, offline edit upload, deletion, two-sided conflicts in a folder mirror, selective file pinning, moved pins, backup retention and a replaced local root. API tests check requests using fixtures. Workspace permissions, real Google invitation delivery, Shared drives, high-volume sync, expiring credentials mid-transfer, USB hardware and end-to-end Google authentication remain unverified. These distinctions matter before assigning the app an important Drive.
