@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode, urlsplit
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import oauth
 
@@ -59,25 +59,32 @@ class DirectConnectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Reconnect"):
             oauth.token_for(ident)
 
-    def test_transfer_renewal_preserves_newer_account_state(self):
+    def test_scoped_transfer_refresh(self):
         ident = "direct:123"
         with oauth.database() as db:
             db.execute("INSERT INTO accounts VALUES(?,?,?,?,?,?,?)",
-                       (ident, "a@example.invalid", "client", "secret", "original", "old", time.time()+300))
-        account = oauth.current_account(ident)
-        credentials = oauth.transfer_credentials(account)
-        self.assertEqual(credentials["client_id"], "client")
-        token = json.loads(credentials["token"])
-        self.assertTrue(token["expiry"].endswith("+00:00"))
-        self.assertEqual(token["refresh_token"], "original")
-        token.update(access_token="new", refresh_token="rotated", expiry="2099-10-31T12:34:56.123456789Z")
-        oauth.save_transfer_token(account, token)
-        self.assertEqual(oauth.current_account(ident)["refresh"], "rotated")
-        oauth.save_transfer_token(account, dict(token, access_token="stale"))
-        self.assertEqual(oauth.token_for(ident), "new")
-        oauth.forget(ident)
-        oauth.save_transfer_token(account, token)
-        self.assertEqual(oauth.accounts(), [])
+                       (ident, "a@example.invalid", "client", "secret", "real-grant", "old", time.time()+180))
+        with oauth.transfer_credentials(ident) as config:
+            self.assertNotIn("real-grant", json.dumps(config))
+            token = json.loads(config["token"])
+            fields = dict(grant_type="refresh_token", refresh_token="wrong")
+            def request():
+                return urlopen(Request(config["token_url"], data=urlencode(fields).encode()), timeout=5)
+            with self.assertRaises(HTTPError) as denied:
+                request()
+            self.assertEqual(denied.exception.code, 403)
+            fields["refresh_token"] = token["refresh_token"]
+            with patch.object(oauth, "exchange", return_value=dict(access_token="new", refresh_token="rotated",
+                                                                   expires_in=3600)) as exchange:
+                with request() as response:
+                    reply = json.load(response)
+                self.assertEqual(reply["access_token"], "new")
+                self.assertLessEqual(reply["expires_in"], 3600-oauth.TRANSFER_MARGIN)
+                self.assertEqual(exchange.call_args.args[0]["refresh_token"], "real-grant")
+                self.assertEqual(oauth.current_account(ident)["refresh"], "rotated")
+                oauth.forget(ident)
+                with self.assertRaises(HTTPError):
+                    request()
 
     def test_temporary_token_service_failure(self):
         for code in (429, 503):

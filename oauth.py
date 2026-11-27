@@ -1,15 +1,16 @@
 """Google's installed-app OAuth flow for Drive search and scheduled sync."""
 import base64
 from contextlib import closing, contextmanager
-from datetime import datetime, timezone
 import hashlib
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
 import secrets
 import sqlite3
 import time
+import threading
+from datetime import datetime, timezone
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import Request, urlopen
@@ -63,13 +64,13 @@ def exchange(fields):
         raise ValueError(f"Google declined the token request (HTTP {exc.code}). Reconnect Google Drive.") from None
 
 
-def current_account(ident):
+def current_account(ident, min_validity=90):
     with database() as db:
         db.execute("BEGIN IMMEDIATE")
         row = db.execute("SELECT * FROM accounts WHERE id=?", (ident,)).fetchone()
         if not row:
             raise ValueError("Reconnect this Google Drive account.")
-        if row["expires"] > time.time() + 90:
+        if row["expires"] > time.time() + min_validity:
             return row
         result = exchange(dict(client_id=row["client_id"], client_secret=row["client_secret"],
                                grant_type="refresh_token", refresh_token=row["refresh"]))
@@ -83,24 +84,58 @@ def token_for(ident):
     return current_account(ident)["access"]
 
 
-def transfer_credentials(account):
-    expiry = datetime.fromtimestamp(account["expires"], timezone.utc).isoformat()
-    token = dict(access_token=account["access"], refresh_token=account["refresh"],
-                 expiry=expiry, token_type="Bearer")
-    return dict(client_id=account["client_id"], client_secret=account["client_secret"],
-                token=json.dumps(token))
+# Refresh ahead of expiry so requests that already carry the old token can finish.
+TRANSFER_MARGIN = 300
 
 
-def save_transfer_token(account, token):
-    if token["access_token"] == account["access"]:
-        return
-    expiry = datetime.fromisoformat(token["expiry"].replace("Z", "+00:00")).timestamp()
-    # A forgotten, reconnected or concurrently refreshed account owns its newer grant.
-    with database() as db:
-        db.execute("""UPDATE accounts SET access=?, expires=?, refresh=?
-                      WHERE id=? AND access=? AND refresh=? AND client_id=? AND expires=?""",
-                   (token["access_token"], expiry, token.get("refresh_token") or account["refresh"],
-                    account["id"], account["access"], account["refresh"], account["client_id"], account["expires"]))
+@contextmanager
+def transfer_credentials(ident):
+    account = current_account(ident)
+    key = secrets.token_urlsafe(32)
+
+    class RefreshHandler(BaseHTTPRequestHandler):
+        timeout = 5
+
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            try:
+                size = int(self.headers.get("Content-Length", 0))
+                if self.path != "/token" or not 0 < size <= 4096:
+                    self.send_error(400)
+                    return
+                form = parse_qs(self.rfile.read(size).decode("ascii"))
+                if (form.get("grant_type") != ["refresh_token"] or
+                        form.get("refresh_token") != [key]):
+                    self.send_error(403)
+                    return
+                renewed = current_account(ident, TRANSFER_MARGIN + 90)
+                reply = json.dumps(dict(access_token=renewed["access"], token_type="Bearer",
+                                        expires_in=max(1, int(renewed["expires"] - time.time()) - TRANSFER_MARGIN)))
+            except (ValueError, OSError, sqlite3.Error):
+                self.send_error(503)
+                return
+            body = reply.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    with ThreadingHTTPServer(("127.0.0.1", 0), RefreshHandler) as server:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            expiry = datetime.fromtimestamp(account["expires"] - TRANSFER_MARGIN, timezone.utc).isoformat()
+            token = dict(access_token=account["access"], refresh_token=key, expiry=expiry, token_type="Bearer")
+            # Only this worker's ephemeral key goes into rclone's private config.
+            yield dict(client_id="drive-desk", client_secret="local",
+                       token_url=f"http://127.0.0.1:{server.server_port}/token", token=json.dumps(token))
+        finally:
+            server.shutdown()
+            thread.join()
 
 
 def connect(client, open_browser, cancelled, identify):

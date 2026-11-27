@@ -246,14 +246,11 @@ def run():
                 db.execute("UPDATE jobs SET status='Running' WHERE id=?", (key,))
             try:
                 ident = job["account"]
-                direct = oauth.current_account(ident) if ident.startswith(oauth.PREFIX) else None
-                credentials = (oauth.transfer_credentials(direct) if direct else
-                               {"token": json.dumps(dict(access_token=token_for(ident), token_type="Bearer"))})
                 env = {k: v for k, v in os.environ.items() if not k.startswith("RCLONE_")}
                 if preference("proxy") == "direct":
                     env["no_proxy"] = env["NO_PROXY"] = "*"
                 config = configparser.RawConfigParser()
-                config["desk"] = {"type": "drive", **credentials,
+                config["desk"] = {"type": "drive",
                                   "skip_gdocs": "true", "skip_shortcuts": "true", "use_trash": "true"}
                 if job["remote"] != "root":
                     config["desk"]["root_folder_id"] = job["remote"]
@@ -265,17 +262,17 @@ def run():
                 # A named config keeps the remote identity stable across token rotations.
                 with tempfile.TemporaryDirectory(prefix="drive-desk-") as private:
                     path = Path(private) / "rclone.conf"
-                    with path.open("x") as output:
-                        config.write(output)
-                    env["RCLONE_CONFIG"] = str(path)
-                    try:
+                    if ident.startswith(oauth.PREFIX):
+                        credentials = oauth.transfer_credentials(ident)
+                    else:
+                        token = dict(access_token=token_for(ident), token_type="Bearer")
+                        credentials = contextlib.nullcontext({"token": json.dumps(token)})
+                    with credentials as fields:
+                        config["desk"].update(fields)
+                        with path.open("x") as output:
+                            config.write(output)
+                        env["RCLONE_CONFIG"] = str(path)
                         transfer(job, dest, env)
-                    finally:
-                        if direct:
-                            # rclone can renew even if a later file operation fails.
-                            with path.open() as updated:
-                                config.read_file(updated)
-                            oauth.save_transfer_token(direct, json.loads(config["desk"]["token"]))
                 status = "Up to date"
             except Exception as exc:
                 status = "Needs attention — " + str(exc)
