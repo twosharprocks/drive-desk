@@ -6,7 +6,7 @@ trap 'rm -rf "$stage"' EXIT
 install -Dm755 drive-desk "$stage/usr/share/drive-desk/drive-desk"
 mkdir -p "$stage/usr/bin"
 ln -s ../share/drive-desk/drive-desk "$stage/usr/bin/drive-desk"
-for module in cloud.py sync.py desktop_tools.py portable.py; do
+for module in oauth.py cloud.py sync.py desktop_tools.py portable.py; do
     install -Dm644 "$module" "$stage/usr/share/drive-desk/$module"
 done
 for unit in drive-desk-sync.service drive-desk-sync.timer; do

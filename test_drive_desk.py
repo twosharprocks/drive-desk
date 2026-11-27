@@ -68,6 +68,28 @@ class DriveTests(unittest.TestCase):
             self.assertIn("Online Accounts", window.status.get_text())
         window.destroy()
 
+    def test_direct_account_without_gnome_files(self):
+        import cloud
+        import oauth
+        application = Gtk.Application(flags=Gio.ApplicationFlags.NON_UNIQUE)
+        application.register(None)
+        ident = "direct:fixture"
+        with mock.patch.object(cloud, "account_manager", side_effect=GLib.Error("Unavailable")), \
+                mock.patch.object(oauth, "accounts", return_value=[(ident, "fixture@example.invalid")]):
+            window = app["Window"](application)
+            try:
+                self.assertEqual(window.accounts.get_active_id(), ident)
+                self.assertTrue(window.actions.get_sensitive())
+                self.assertTrue(window.forget_button.get_visible())
+                self.assertTrue(all(not action.get_sensitive() for action in window.mount_actions))
+                with mock.patch.dict(app["Window"].search.__globals__, Search=mock.Mock()) as globals_:
+                    window.search()
+                    globals_["Search"].assert_called_once_with(window, ident)
+                with mock.patch.object(oauth, "token_for", return_value="authorized"):
+                    self.assertEqual(cloud.token_for(ident), "authorized")
+            finally:
+                window.destroy()
+
     def test_search_and_jobs_windows(self):
         import desktop_tools
         parent = Gtk.Window()

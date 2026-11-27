@@ -9,9 +9,10 @@ from pathlib import Path
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gio, GLib, Gtk
+import oauth
 import cloud
 import portable
-from desktop_tools import Jobs, Search, button, history, preferences, schedule, toggle_transfers
+from desktop_tools import Jobs, Search, async_call, button, history, preferences, schedule, toggle_transfers
 import sync
 
 
@@ -46,10 +47,11 @@ class Window(Gtk.ApplicationWindow):
         self.box.pack_start(self.accounts, False, False, 0)
         self.actions = Gtk.Box(spacing=8)
         self.box.pack_start(self.actions, False, False, 0)
-        self.button("Open in Files", lambda *_: self.mount(False))
-        self.button("Save an offline copy…", lambda *_: self.mount(True))
+        open_files = self.button("Open in Files", lambda *_: self.mount(False))
+        save = self.button("Save an offline copy…", lambda *_: self.mount(True))
         self.button("Search Drive…", lambda *_: self.search())
-        self.button("Link to folder…", lambda *_: self.mount("shortcut"))
+        link = self.button("Link to folder…", lambda *_: self.mount("shortcut"))
+        self.mount_actions = (open_files, save, link)
         self.status = Gtk.Label(xalign=0, wrap=True, selectable=True)
         self.box.pack_start(self.status, True, True, 0)
         self.summary = Gtk.Label(xalign=0, wrap=True)
@@ -61,6 +63,8 @@ class Window(Gtk.ApplicationWindow):
         self.pause_button = button(activity, "Pause all transfers", self.toggle_sync)
         footer = Gtk.Box(spacing=8)
         self.box.pack_end(footer, False, False, 0)
+        self.connect_button = button(footer, "Connect Google Drive…", self.connect_google)
+        self.forget_button = button(footer, "Forget connection", self.forget_google)
         settings = Gtk.Button(label="Online Accounts…")
         settings.connect("clicked", self.settings)
         footer.pack_start(settings, False, False, 0)
@@ -86,6 +90,7 @@ class Window(Gtk.ApplicationWindow):
         self.connect("delete-event", self.closing)
         self.show_all()
         self.refresh()
+        self.accounts.connect("changed", lambda *_: self.controls())
         self.accounts.connect("changed", lambda *_: self.update_summary())
         self.update_summary()
         source = GLib.timeout_add_seconds(3, self.retry_service)
@@ -152,8 +157,6 @@ class Window(Gtk.ApplicationWindow):
                 self.status.set_text(str(exc))
 
     def retry_service(self):
-        if self.client is None:
-            self.refresh()
         self.update_summary()
         return True
 
@@ -195,33 +198,86 @@ class Window(Gtk.ApplicationWindow):
 
     def refresh(self, *_):
         previous = self.accounts.get_active_id()
-        self.accounts.remove_all()
-        try:
-            if self.client is None:
+        if self.client is None:
+            try:
                 self.client = cloud.account_manager()
                 for event in ("object-added", "object-removed", "interface-added", "interface-removed", "interface-proxy-properties-changed"):
                     self.client.connect(event, self.refresh)
-            rows = []
-            self.account_ids.clear()
-            for ident, label, uri, _ in cloud.google_accounts(self.client):
-                if uri:
-                    rows.append((uri, label))
-                    self.account_ids[uri] = ident
-            for uri, label in sorted(rows, key=lambda item: item[1]):
-                self.accounts.append(uri, label)
-            if rows and not (previous and self.accounts.set_active_id(previous)):
-                self.accounts.set_active(0)
-            if not self.cancel:
-                self.status.set_text("Files are available while connected." if rows else
-                                     "Open Online Accounts, add Google, and enable Files.")
-        except GLib.Error as exc:
-            self.status.set_text(f"Online Accounts is unavailable. {exc.message}")
+            except GLib.Error:
+                pass
+        rows = [(ident, label + " (direct)", ident) for ident, label in oauth.accounts()]
+        if self.client:
+            rows.extend((uri, label, ident) for ident, label, uri, _ in cloud.google_accounts(self.client) if uri)
+        self.accounts.remove_all()
+        self.account_ids.clear()
+        for key, label, ident in sorted(rows, key=lambda item: item[1]):
+            self.account_ids[key] = ident
+            self.accounts.append(key, label)
+        if rows and not (previous and self.accounts.set_active_id(previous)):
+            self.accounts.set_active(0)
+        if not self.cancel:
+            self.status.set_text("Choose a Drive action." if rows else
+                                 "Connect Google Drive for search and sync, or enable Files in Online Accounts.")
         self.controls()
 
     def controls(self):
+        key = self.accounts.get_active_id() or ""
+        direct = key.startswith(oauth.PREFIX)
         self.stop.set_visible(self.cancel is not None)
+        self.connect_button.set_sensitive(self.cancel is None)
+        self.forget_button.set_visible(direct)
+        self.forget_button.set_sensitive(self.cancel is None)
         self.accounts.set_sensitive(self.cancel is None)
-        self.actions.set_sensitive(bool(self.accounts.get_active_id()) and self.cancel is None)
+        self.actions.set_sensitive(bool(key) and self.cancel is None)
+        for widget in self.mount_actions:
+            widget.set_sensitive(not direct)
+            widget.set_tooltip_text("Requires Files in GNOME Online Accounts." if direct else None)
+
+    def connect_google(self):
+        path = Path(__file__).resolve().with_name("google-desktop-client.json")
+        if not path.is_file():
+            chooser = Gtk.FileChooserNative.new("Choose Drive Desk’s Google Desktop app client JSON",
+                                                self, Gtk.FileChooserAction.OPEN, "Connect", "Cancel")
+            if chooser.run() != Gtk.ResponseType.ACCEPT:
+                chooser.destroy()
+                return
+            path = chooser.get_filename()
+            chooser.destroy()
+        try:
+            client = oauth.load_client(path)
+        except (ValueError, OSError) as exc:
+            self.status.set_text(str(exc))
+            return
+        self.cancel = Gio.Cancellable()
+        cancel = self.cancel
+        self.status.set_text("Finish connecting Google Drive in your browser.")
+        self.controls()
+
+        def identify(token):
+            return cloud.request(token, "about", {"fields": "user(permissionId,emailAddress)"})["user"]
+
+        def finished(ident, error):
+            self.cancel = None
+            self.refresh()
+            if error:
+                self.status.set_text(error)
+            else:
+                self.accounts.set_active_id(ident)
+                self.status.set_text("Connected. Use Search Drive to select a folder to keep offline.")
+
+        async_call(self, lambda: oauth.connect(client, lambda url: Gio.AppInfo.launch_default_for_uri(url, None),
+                                               cancel.is_cancelled, identify), finished)
+
+    def forget_google(self):
+        ident = self.accounts.get_active_id()
+        dialog = Gtk.MessageDialog(transient_for=self, modal=True, buttons=Gtk.ButtonsType.OK_CANCEL,
+                                   text="Forget this Google Drive connection on this device?")
+        dialog.format_secondary_text("Scheduled jobs keep their files and require reconnection. You can revoke Google access in your Google Account.")
+        confirmed = dialog.run() == Gtk.ResponseType.OK
+        dialog.destroy()
+        if confirmed:
+            oauth.forget(ident)
+            self.refresh()
 
     def settings(self, *_):
         if portable.enabled:

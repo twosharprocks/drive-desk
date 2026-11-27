@@ -14,9 +14,15 @@ Drive Desk is an independent, MIT-licensed Google Drive desktop client for Linux
 
 **Check your desktop before installing.** All three packages currently need GNOME Online Accounts to offer **Files** for your Google account. On-demand browsing also uses the host’s GVfs Google backend. On stock Fedora 44, Google sign-in succeeded but the account exposed only Mail, Calendar and Contacts. Drive Desk could not start a sync job. Changing package formats on the same host does not supply the missing service. [GNOME discussion](https://discourse.gnome.org/t/google-drive-in-gnome-50/34417/2)
 
+## Direct connection in development builds
+
+Choose **Connect Google Drive…** and select a Desktop app client JSON for a Google Cloud project with the Drive API enabled. For a project in testing, add your Google address to the OAuth test audience. Google opens in your browser and asks for Drive access so the app can read and update existing files. After connecting, choose **Search Drive → Keep offline** and select the folder you want to sync. Connecting alone creates no sync jobs. The published 0.4.0 installers use the GNOME connection described above. [Google desktop authorization setup](https://developers.google.com/identity/protocols/oauth2/native-app)
+
+The selected account appears with **(direct)** in its name. Search and the scheduler use this connection. Files integration still requires a GNOME Files-enabled account. Direct authorization credentials are stored locally, unencrypted, in an owner-only database under the package’s Drive Desk state directory. **Forget connection** removes the local connection. Use your Google Account’s connected-app settings to revoke the grant at Google.
+
 ## Development priorities
 
-1. Add **Connect Google Drive** inside the app using browser-based Google authorization. Let search and selected-folder sync work independently of GNOME Files. Keep **Open in Files** available on desktops with the Google backend.
+1. Complete live verification of the development branch’s direct Google connection before shipping new installers.
 2. Verify the new connection with the Fedora Flatpak and Ubuntu Snap. The release check should download a Windows-created file, upload an offline Linux edit after reconnection, download a second Windows edit, and verify an untouched control file by checksum.
 3. Make sync problems easier to recover from. Show the affected folder and last successful sync, and give distinct actions for an expired login, an unavailable disk, and a file conflict.
 

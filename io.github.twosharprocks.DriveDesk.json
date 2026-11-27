@@ -39,7 +39,7 @@
         "install -Dm644 LICENSE /app/share/licenses/drive-desk/LICENSE"
       ],
       "sources": [
-        {"type": "file", "path": "drive-desk"}, {"type": "file", "path": "cloud.py"},
+        {"type": "file", "path": "drive-desk"}, {"type": "file", "path": "cloud.py"}, {"type": "file", "path": "oauth.py"},
         {"type": "file", "path": "portable.py"}, {"type": "file", "path": "desktop_tools.py"},
         {"type": "file", "path": "sync.py"}, {"type": "file", "path": "drive-desk.desktop"},
         {"type": "file", "path": "LICENSE"},

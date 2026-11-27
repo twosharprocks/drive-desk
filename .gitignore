@@ -9,3 +9,5 @@ __pycache__/
 /parts/
 /prime/
 /stage/
+google-desktop-client.json
+client_secret*.json
