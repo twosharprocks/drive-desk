@@ -7,11 +7,11 @@ Use a dedicated test login with one initialized two-way mirror of a disposable D
 3. Run `live_renewal.py verify FOLDER CONTROL_SHA256 WINDOWS_EDIT_SHA256` in the same package context. It checks the refreshed expiry, the job's successful run timestamp, and the downloaded bytes. It does not print tokens. If Windows has not finished propagating the edit, repeat verification after the next scheduled cycle.
 4. Append another unique line on Linux. Wait for a subsequent scheduled run, then compare both SHA-256 values in the Windows Drive mount and on Linux. Leave the control file untouched throughout.
 
-For a Flatpak test branch, copy the helper into the guest user's home and use the following invocation for steps 1 and 3. Supply the real folder and hashes as individual arguments.
+For the released Flatpak, copy the helper into the guest user's home and use the following invocation for steps 1 and 3. Supply the real folder and hashes as individual arguments.
 
 ```sh
 flatpak run --command=python3 --env=PYTHONPATH=/app/share/drive-desk \
-  io.github.twosharprocks.DriveDesk//oauth-test \
+  io.github.twosharprocks.DriveDesk//stable \
   "$HOME/live_renewal.py" arm "$folder" "$control_sha256" "$original_sha256"
 ```
 
@@ -27,3 +27,7 @@ cd "$SNAP_USER_COMMON/live-test"
 Start the scheduler from a separate shell with `snap run drive-desk --background`. To test the upload first, append the first edit on Ubuntu after arming, wait for Windows to receive it, and use its new digest for `verify`. Then edit the Windows file and wait for the recurring download.
 
 The expiry override exercises a real Google refresh at the start of a run. Expiry during a long transfer and automatic startup after desktop login are separate checks.
+
+## 0.5.0 final checks
+
+The final Debian 13 package, Fedora 44 Flatpak and Ubuntu 24.04.5 strict Snap each passed the 17-test suite against their installed application code. The final Fedora and Ubuntu workers also synchronized their existing disposable mirrors, reported **Up to date**, and preserved the expected payload and control hashes. See [the feature inventory](../FEATURES.md) for the live offline-edit, timer and OAuth renewal checks performed during development.
