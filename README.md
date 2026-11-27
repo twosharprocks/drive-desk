@@ -24,7 +24,9 @@ The selected account appears with **(direct)** in its name. Search and the sched
 
 ## Verification and remaining work
 
-The Fedora Flatpak and Ubuntu Snap completed live round trips with Google Drive for Windows using one disposable folder. Both exercised real token renewal at the start of a background run. Desktop sign-in autostart and token expiry during a long transfer remain open checks for a future maintainer. [Test procedure](tests/LIVE.md) · [Feature coverage and verification history](FEATURES.md)
+The Fedora Flatpak and Ubuntu Snap completed live round trips with Google Drive for Windows using one disposable folder. Both renewed a Google token at the start of a background run. The released 0.5.0 packages also started automatically after desktop sign-in and uploaded a pending file whose SHA-256 matched on Windows.
+
+**Known limitation in 0.5.0.** When the token expired during a throttled two-way upload, both packages stopped partway through and an ordinary retry could not resume. All 32 local files remained intact in each test. See **Operations and recovery** below before reconnecting an affected mirror. [Open issue](https://github.com/twosharprocks/drive-desk/issues/2) · [Test procedure](tests/LIVE.md) · [Feature coverage and verification history](FEATURES.md)
 
 ## Install and connect
 
@@ -79,7 +81,7 @@ The main window shows the selected account’s scheduled-folder status and unrea
 
 ## Operations and recovery
 
-Open **Scheduled folders → Activity** to inspect the last two run logs. **Storage** shows local folder usage, free disk space and Google account usage when accessible. Jobs, sync listings and logs are stored in `$XDG_STATE_HOME/drive-desk` (default `~/.local/state/drive-desk`). The worker obtains an access token for the selected account and supplies it in a private, temporary rclone configuration. A stable remote name lets existing mirrors retain their sync history when the token changes. Provider errors and expired tokens can interrupt transfers. The scheduler obtains another token on a later run.
+Open **Scheduled folders → Activity** to inspect the last two run logs. **Storage** shows local folder usage, free disk space and Google account usage when accessible. Jobs, sync listings and logs are stored in `$XDG_STATE_HOME/drive-desk` (default `~/.local/state/drive-desk`). The worker obtains an access token for the selected account and supplies it in a private, temporary rclone configuration. A stable remote name lets existing mirrors retain their sync history when the token changes. The scheduler can renew a token before starting a run. If it expires during a two-way transfer, the job can stop with **Needs attention** after uploading only some files. A fresh token on the next run may leave rclone unable to find valid sync listings. Pause an affected job and preserve both copies before recovery.
 
 If a job reports a missing marker, disconnected disk, duplicate name or invalid baseline, preserve the local folder and inspect Activity. Reconnect the original disk or resolve duplicate names on Drive where applicable. If the sync engine requires a fresh baseline, pause the job, keep the existing tree, disconnect, and create a fresh mirror in a separate empty folder. Compare and recover any offline-only files before removing old data. Drive Desk never automatically forces a resync of an established mirror.
 
