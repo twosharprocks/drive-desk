@@ -11,6 +11,12 @@ Gio, GLib, Gtk = (app[name] for name in ("Gio", "GLib", "Gtk"))
 
 
 class DriveTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.application = Gtk.Application(flags=Gio.ApplicationFlags.NON_UNIQUE)
+        if not cls.application.register(None):
+            raise RuntimeError("Could not register GTK test application.")
+
     def test_portable_worker_lifetime(self):
         import portable
         import sync
@@ -53,9 +59,7 @@ class DriveTests(unittest.TestCase):
             self.assertEqual(set(folder.iterdir()), {src, dst})
 
     def test_window(self):
-        application = Gtk.Application(application_id=os.getenv("DRIVE_DESK_APP_ID", "org.example.DriveDeskTest"))
-        application.register(None)
-        window = app["Window"](application)
+        window = app["Window"](self.application)
         self.assertIsNotNone(window.client)
         self.assertTrue(window.get_visible())
         self.assertEqual(window.get_title(), "Drive Desk")
@@ -71,12 +75,10 @@ class DriveTests(unittest.TestCase):
     def test_direct_account_without_gnome_files(self):
         import cloud
         import oauth
-        application = Gtk.Application(flags=Gio.ApplicationFlags.NON_UNIQUE)
-        application.register(None)
         ident = "direct:fixture"
         with mock.patch.object(cloud, "account_manager", side_effect=GLib.Error("Unavailable")), \
                 mock.patch.object(oauth, "accounts", return_value=[(ident, "fixture@example.invalid")]):
-            window = app["Window"](application)
+            window = app["Window"](self.application)
             try:
                 self.assertEqual(window.accounts.get_active_id(), ident)
                 self.assertTrue(window.actions.get_sensitive())
