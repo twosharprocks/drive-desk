@@ -52,3 +52,7 @@ A separate live test used a Files-enabled GNOME Google account and one selected 
 On Fedora 44, all 12 automated tests passed inside the released Flatpak. Google sign-in succeeded in GNOME Online Accounts, but the host exposed no Files interface for that account. The client stopped before registering a job or downloading files. The offline upload and return trip remain unverified on Fedora.
 
 The strict Snap launched and passed automated tests on Ubuntu. Its live Google Drive round trip remains unverified.
+
+### Direct Google connection development build
+
+On 27 November 2026 the Fedora 44 development Flatpak completed a live round trip with Google Drive for Windows. After browser consent, the test registered one disposable folder using the packaged sync code and invoked the packaged worker for each transfer. Fedora downloaded both Windows seed files. With the VM network link down, Fedora edited one file. After reconnection Windows received the edit, then Fedora received a subsequent Windows edit. SHA-256 matched on both systems, including the unchanged control file. This test covers manual worker invocation with a fresh direct authorization. Unattended scheduling and live token renewal still need separate checks, as does the Ubuntu Snap round trip.

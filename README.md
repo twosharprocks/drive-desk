@@ -22,8 +22,8 @@ The selected account appears with **(direct)** in its name. Search and the sched
 
 ## Development priorities
 
-1. Complete live verification of the development branch’s direct Google connection before shipping new installers.
-2. Verify the new connection with the Fedora Flatpak and Ubuntu Snap. The release check should download a Windows-created file, upload an offline Linux edit after reconnection, download a second Windows edit, and verify an untouched control file by checksum.
+1. Repeat the successful Fedora 44 direct-login round trip with the Ubuntu Snap, then verify unattended scheduling and token renewal before shipping new installers.
+2. Use the Fedora live test as a release check for each package. Download a Windows-created file, upload an offline Linux edit after reconnection, download a second Windows edit, and verify an untouched control file by checksum.
 3. Make sync problems easier to recover from. Show the affected folder and last successful sync, and give distinct actions for an expired login, an unavailable disk, and a file conflict.
 
 ## Install and connect
