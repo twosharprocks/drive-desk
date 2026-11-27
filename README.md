@@ -22,7 +22,7 @@ The selected account appears with **(direct)** in its name. Search and the sched
 
 ## Development priorities
 
-1. Complete the Ubuntu Snap live round trip and check desktop sign-in startup before shipping new installers. The Fedora 44 development Flatpak has passed unattended sync in both directions and live OAuth renewal, including a cold background launch. [Repeat the scheduler check](tests/LIVE.md)
+1. Check desktop sign-in startup before shipping new installers. The strict Ubuntu 24.04 development Snap passed the live Windows round trip, including an offline edit. The Fedora 44 development Flatpak has passed unattended sync in both directions and live OAuth renewal, including a cold background launch. [Repeat the scheduler check](tests/LIVE.md)
 2. Use the Fedora live test as a release check for each package. Download a Windows-created file, upload an offline Linux edit after reconnection, download a second Windows edit, and verify an untouched control file by checksum.
 3. Make sync problems easier to recover from. Show the affected folder and last successful sync, and give distinct actions for an expired login, an unavailable disk, and a file conflict.
 

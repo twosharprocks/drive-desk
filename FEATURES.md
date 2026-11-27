@@ -51,10 +51,12 @@ A separate live test used a Files-enabled GNOME Google account and one selected 
 
 On Fedora 44, all 12 automated tests passed inside the released Flatpak. Google sign-in succeeded in GNOME Online Accounts, but the host exposed no Files interface for that account. The client stopped before registering a job or downloading files. The offline upload and return trip remain unverified on Fedora.
 
-The strict Snap launched and passed automated tests on Ubuntu. Its live Google Drive round trip remains unverified.
+The released 0.4.0 strict Snap launched and passed automated tests on Ubuntu. The live Ubuntu result below applies to the direct-login development build.
 
 ### Direct Google connection development build
 
 On 27 November 2026 the Fedora 44 development Flatpak completed a live round trip with Google Drive for Windows. After browser consent, the test registered one disposable folder using the packaged sync code and invoked the packaged worker for each transfer. Fedora downloaded both Windows seed files. With the VM network link down, Fedora edited one file. After reconnection Windows received the edit, then Fedora received a subsequent Windows edit. SHA-256 matched on both systems, including the unchanged control file. This first test used manual worker invocation with a fresh direct authorization.
 
 In a separate live check, the Fedora scheduler downloaded a Windows edit and uploaded a later Fedora edit on its recurring timer. After stopping the existing instance, launching the packaged app with `--background` also uploaded an edit. The checks marked the test account’s cached expiry due, verified that the stored expiry advanced after contacting Google, and compared SHA-256 at both endpoints. The control file matched throughout. These checks exercise renewal before transfer. Automatic startup after desktop sign-in and expiry during a long transfer remain unverified.
+
+On 27 November 2026 the strict development Snap on Ubuntu 24.04.5 LTS passed a live round trip with Google Drive for Windows. The headless Ubuntu VM received its own OAuth callback from the Windows browser over a loopback SSH tunnel. The packaged worker downloaded the two Windows seed files. Ubuntu recorded the test edit while its network link was down. After reconnection, Windows received that edit and Ubuntu downloaded a subsequent Windows edit. Both systems matched by SHA-256 for the edited file and the untouched control. This run invoked the worker directly. Ubuntu scheduler startup and token renewal remain separate checks.
