@@ -22,7 +22,7 @@ The selected account appears with **(direct)** in its name. Search and the sched
 
 ## Development priorities
 
-1. Check desktop sign-in startup before shipping new installers. The strict Ubuntu 24.04 development Snap passed the live Windows round trip, including an offline edit. The Fedora 44 development Flatpak has passed unattended sync in both directions and live OAuth renewal, including a cold background launch. [Repeat the scheduler check](tests/LIVE.md)
+1. Check desktop sign-in startup before shipping new installers. The strict Ubuntu 24.04 development Snap passed the live Windows round trip, including an offline edit. Both the Fedora 44 development Flatpak and the Ubuntu 24.04 development Snap passed unattended sync in both directions and live OAuth renewal, including a cold background launch. [Repeat the scheduler check](tests/LIVE.md)
 2. Use the Fedora live test as a release check for each package. Download a Windows-created file, upload an offline Linux edit after reconnection, download a second Windows edit, and verify an untouched control file by checksum.
 3. Make sync problems easier to recover from. Show the affected folder and last successful sync, and give distinct actions for an expired login, an unavailable disk, and a file conflict.
 
@@ -80,7 +80,7 @@ The main window shows the selected account’s scheduled-folder status and unrea
 
 ## Operations and recovery
 
-Open **Scheduled folders → Activity** to inspect the last two run logs. **Storage** shows local folder usage, free disk space and Google account usage when accessible. Jobs, sync listings and logs are stored in `$XDG_STATE_HOME/drive-desk` (default `~/.local/state/drive-desk`). The app requests an access token from GNOME per worker run and passes it to the transfer process in its environment. Provider errors and expired tokens can interrupt transfers. The scheduler obtains another token on a later run.
+Open **Scheduled folders → Activity** to inspect the last two run logs. **Storage** shows local folder usage, free disk space and Google account usage when accessible. Jobs, sync listings and logs are stored in `$XDG_STATE_HOME/drive-desk` (default `~/.local/state/drive-desk`). The development worker obtains an access token for the selected account and supplies it in a private, temporary rclone configuration. A stable remote name lets existing mirrors retain their sync history when the token changes. Provider errors and expired tokens can interrupt transfers. The scheduler obtains another token on a later run.
 
 If a job reports a missing marker, disconnected disk, duplicate name or invalid baseline, preserve the local folder and inspect Activity. Reconnect the original disk or resolve duplicate names on Drive where applicable. If the sync engine requires a fresh baseline, pause the job, keep the existing tree, disconnect, and create a fresh mirror in a separate empty folder. Compare and recover any offline-only files before removing old data. Drive Desk never automatically forces a resync of an established mirror.
 

@@ -15,4 +15,15 @@ flatpak run --command=python3 --env=PYTHONPATH=/app/share/drive-desk \
   "$HOME/live_renewal.py" arm "$folder" "$control_sha256" "$original_sha256"
 ```
 
+For the strict Snap, copy the helper into `~/snap/drive-desk/common/live-test/`. In the test user's desktop session, open `snap run --shell drive-desk` and use the staged runtime for the helper:
+
+```sh
+export XDG_STATE_HOME="$SNAP_USER_COMMON/state"
+export PYTHONPATH="$SNAP/share/drive-desk:$SNAP/gnome-platform/usr/lib/python3/dist-packages:$SNAP/usr/lib/python3/dist-packages"
+cd "$SNAP_USER_COMMON/live-test"
+"$SNAP/snap/command-chain/desktop-launch" /usr/bin/python3 live_renewal.py arm "$folder" "$control_sha256" "$original_sha256"
+```
+
+Start the scheduler from a separate shell with `snap run drive-desk --background`. To test the upload first, append the first edit on Ubuntu after arming, wait for Windows to receive it, and use its new digest for `verify`. Then edit the Windows file and wait for the recurring download.
+
 The expiry override exercises a real Google refresh at the start of a run. Expiry during a long transfer and automatic startup after desktop login are separate checks.

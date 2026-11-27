@@ -1,10 +1,12 @@
 """Persistent, serialized background sync for a logged-in GNOME user."""
+import configparser
 import contextlib
 import csv
 import fcntl
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import tempfile
@@ -110,13 +112,43 @@ def add_job(account, kind, local, remote, label, team="", up=0, down=0, pin=None
     return key
 
 
+def bisync_workdir(work):
+    # Older rclone versions included a hash of environment overrides in listing names.
+    # Keep the original pair intact and publish both stable names together.
+    migrated = work / "stable-listings"
+    if migrated.is_dir():
+        return migrated
+    legacy = list(work.glob("desk{*"))
+    if not legacy:
+        return work
+    first = [p for p in legacy if p.name.endswith(".path1.lst")]
+    if len(first) != 1:
+        raise ValueError("Ambiguous legacy sync listings. Preserve this folder for review.")
+    prefix = first[0].name.removesuffix(".path1.lst")
+    second = work / (prefix + ".path2.lst")
+    allowed = {p.name + suffix for p in (first[0], second) for suffix in ("", "-old")}
+    if (not second.is_file() or any(p.name not in allowed for p in legacy)
+            or any(work.glob("desk_*.path*.lst*")) or any(work.glob("*.lck"))):
+        raise ValueError("Incomplete or conflicting sync listings. Preserve this folder for review.")
+    with tempfile.TemporaryDirectory(dir=work) as temp:
+        stage = Path(temp) / "listings"
+        stage.mkdir(mode=0o700)
+        for src in (first[0], second):
+            name, count = re.subn(r"^desk\{[A-Za-z0-9_-]+\}(?=_)", "desk", src.name, count=1)
+            if not count:
+                raise ValueError("Unrecognized sync listing name.")
+            shutil.copy2(src, stage / name)
+        stage.rename(migrated)
+    return migrated
+
+
 def transfer(job, destination, env):
     folder = Path(job["folder"])
     if folder_key(folder) != job["inode"]:
         raise ValueError("The local folder was moved, replaced, or unmounted.")
     work = state() / job["id"]
     work.mkdir(mode=0o700, exist_ok=True)
-    base = ["rclone", "--config=/dev/null", "--retries=1", "--contimeout=15s", "--timeout=2m"]
+    base = ["rclone", "--config=" + env.get("RCLONE_CONFIG", "/dev/null"), "--retries=1", "--contimeout=15s", "--timeout=2m"]
     cmd = base + ["--verbose"]
     if job["up"] or job["down"]:
         rate = lambda n: str(n) + "k" if n else "off"
@@ -149,7 +181,7 @@ def transfer(job, destination, env):
             if not filter_path.exists():
                 filter_path.write_text(f"+ /{name}\n+ /{marker}\n- **\n")
             filters = ["--filter-from", str(filter_path)]
-        cmd += ["bisync", destination, str(folder), "--workdir", str(work), "--check-access",
+        cmd += ["bisync", destination, str(folder), "--workdir", str(bisync_workdir(work) if destination.startswith("desk:") else work), "--check-access",
                 "--check-filename", marker]
         if filters:
             cmd += ["--filters-file", str(filter_path)]
@@ -216,17 +248,23 @@ def run():
                 env = {k: v for k, v in os.environ.items() if not k.startswith("RCLONE_")}
                 if preference("proxy") == "direct":
                     env["no_proxy"] = env["NO_PROXY"] = "*"
-                env.update(RCLONE_CONFIG_DESK_TYPE="drive", RCLONE_CONFIG_DESK_TOKEN=json.dumps(
-                    dict(access_token=token, token_type="Bearer")), RCLONE_CONFIG_DESK_SKIP_GDOCS="true",
-                    RCLONE_CONFIG_DESK_SKIP_SHORTCUTS="true", RCLONE_CONFIG_DESK_USE_TRASH="true")
+                config = configparser.RawConfigParser()
+                config["desk"] = {"type": "drive", "token": json.dumps(dict(access_token=token, token_type="Bearer")),
+                                  "skip_gdocs": "true", "skip_shortcuts": "true", "use_trash": "true"}
                 if job["remote"] != "root":
-                    env["RCLONE_CONFIG_DESK_ROOT_FOLDER_ID"] = job["remote"]
+                    config["desk"]["root_folder_id"] = job["remote"]
                 if job["team"]:
-                    env["RCLONE_CONFIG_DESK_TEAM_DRIVE"] = job["team"]
+                    config["desk"]["team_drive"] = job["team"]
                 dest = "desk:" if job["kind"] in ("mirror", "pin") else (
                     ("desk:Drive Desk backups/" if job["kind"] == "backup" else "desk:Drive Desk computers/") +
                     Path(job["folder"]).name + "-" + key[:8])
-                transfer(job, dest, env)
+                # A named config keeps the remote identity stable across token rotations.
+                with tempfile.TemporaryDirectory(prefix="drive-desk-") as private:
+                    path = Path(private) / "rclone.conf"
+                    with path.open("x") as output:
+                        config.write(output)
+                    env["RCLONE_CONFIG"] = str(path)
+                    transfer(job, dest, env)
                 status = "Up to date"
             except Exception as exc:
                 status = "Needs attention — " + str(exc)
