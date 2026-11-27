@@ -1,6 +1,8 @@
 """Exercise the real loopback callback with simulated Google endpoints."""
 import base64
 import hashlib
+import json
+import time
 import os
 import tempfile
 import threading
@@ -56,6 +58,26 @@ class DirectConnectionTests(unittest.TestCase):
         oauth.forget(ident)
         with self.assertRaisesRegex(ValueError, "Reconnect"):
             oauth.token_for(ident)
+
+    def test_transfer_renewal_preserves_newer_account_state(self):
+        ident = "direct:123"
+        with oauth.database() as db:
+            db.execute("INSERT INTO accounts VALUES(?,?,?,?,?,?,?)",
+                       (ident, "a@example.invalid", "client", "secret", "original", "old", time.time()+300))
+        account = oauth.current_account(ident)
+        credentials = oauth.transfer_credentials(account)
+        self.assertEqual(credentials["client_id"], "client")
+        token = json.loads(credentials["token"])
+        self.assertTrue(token["expiry"].endswith("+00:00"))
+        self.assertEqual(token["refresh_token"], "original")
+        token.update(access_token="new", refresh_token="rotated", expiry="2099-10-31T12:34:56.123456789Z")
+        oauth.save_transfer_token(account, token)
+        self.assertEqual(oauth.current_account(ident)["refresh"], "rotated")
+        oauth.save_transfer_token(account, dict(token, access_token="stale"))
+        self.assertEqual(oauth.token_for(ident), "new")
+        oauth.forget(ident)
+        oauth.save_transfer_token(account, token)
+        self.assertEqual(oauth.accounts(), [])
 
     def test_temporary_token_service_failure(self):
         for code in (429, 503):

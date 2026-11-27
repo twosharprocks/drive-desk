@@ -14,6 +14,7 @@ import time
 import uuid
 from pathlib import Path
 
+import oauth
 from cloud import token_for
 
 
@@ -244,12 +245,15 @@ def run():
                     continue
                 db.execute("UPDATE jobs SET status='Running' WHERE id=?", (key,))
             try:
-                token = token_for(job["account"])
+                ident = job["account"]
+                direct = oauth.current_account(ident) if ident.startswith(oauth.PREFIX) else None
+                credentials = (oauth.transfer_credentials(direct) if direct else
+                               {"token": json.dumps(dict(access_token=token_for(ident), token_type="Bearer"))})
                 env = {k: v for k, v in os.environ.items() if not k.startswith("RCLONE_")}
                 if preference("proxy") == "direct":
                     env["no_proxy"] = env["NO_PROXY"] = "*"
                 config = configparser.RawConfigParser()
-                config["desk"] = {"type": "drive", "token": json.dumps(dict(access_token=token, token_type="Bearer")),
+                config["desk"] = {"type": "drive", **credentials,
                                   "skip_gdocs": "true", "skip_shortcuts": "true", "use_trash": "true"}
                 if job["remote"] != "root":
                     config["desk"]["root_folder_id"] = job["remote"]
@@ -264,7 +268,14 @@ def run():
                     with path.open("x") as output:
                         config.write(output)
                     env["RCLONE_CONFIG"] = str(path)
-                    transfer(job, dest, env)
+                    try:
+                        transfer(job, dest, env)
+                    finally:
+                        if direct:
+                            # rclone can renew even if a later file operation fails.
+                            with path.open() as updated:
+                                config.read_file(updated)
+                            oauth.save_transfer_token(direct, json.loads(config["desk"]["token"]))
                 status = "Up to date"
             except Exception as exc:
                 status = "Needs attention — " + str(exc)

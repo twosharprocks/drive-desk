@@ -1,6 +1,7 @@
 """Google's installed-app OAuth flow for Drive search and scheduled sync."""
 import base64
 from contextlib import closing, contextmanager
+from datetime import datetime, timezone
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
@@ -62,20 +63,44 @@ def exchange(fields):
         raise ValueError(f"Google declined the token request (HTTP {exc.code}). Reconnect Google Drive.") from None
 
 
-def token_for(ident):
+def current_account(ident):
     with database() as db:
         db.execute("BEGIN IMMEDIATE")
         row = db.execute("SELECT * FROM accounts WHERE id=?", (ident,)).fetchone()
         if not row:
             raise ValueError("Reconnect this Google Drive account.")
         if row["expires"] > time.time() + 90:
-            return row["access"]
+            return row
         result = exchange(dict(client_id=row["client_id"], client_secret=row["client_secret"],
                                grant_type="refresh_token", refresh_token=row["refresh"]))
         db.execute("UPDATE accounts SET access=?, expires=?, refresh=? WHERE id=?",
                    (result["access_token"], time.time() + result["expires_in"],
                     result.get("refresh_token") or row["refresh"], ident))
-        return result["access_token"]
+        return db.execute("SELECT * FROM accounts WHERE id=?", (ident,)).fetchone()
+
+
+def token_for(ident):
+    return current_account(ident)["access"]
+
+
+def transfer_credentials(account):
+    expiry = datetime.fromtimestamp(account["expires"], timezone.utc).isoformat()
+    token = dict(access_token=account["access"], refresh_token=account["refresh"],
+                 expiry=expiry, token_type="Bearer")
+    return dict(client_id=account["client_id"], client_secret=account["client_secret"],
+                token=json.dumps(token))
+
+
+def save_transfer_token(account, token):
+    if token["access_token"] == account["access"]:
+        return
+    expiry = datetime.fromisoformat(token["expiry"].replace("Z", "+00:00")).timestamp()
+    # A forgotten, reconnected or concurrently refreshed account owns its newer grant.
+    with database() as db:
+        db.execute("""UPDATE accounts SET access=?, expires=?, refresh=?
+                      WHERE id=? AND access=? AND refresh=? AND client_id=? AND expires=?""",
+                   (token["access_token"], expiry, token.get("refresh_token") or account["refresh"],
+                    account["id"], account["access"], account["refresh"], account["client_id"], account["expires"]))
 
 
 def connect(client, open_browser, cancelled, identify):

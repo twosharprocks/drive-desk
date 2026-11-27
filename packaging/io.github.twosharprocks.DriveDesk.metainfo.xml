@@ -8,5 +8,5 @@
   <description><p>Connect a Google account to search Drive and synchronize selected folders for offline editing. GNOME Online Accounts also supports browsing in Files.</p></description>
   <launchable type="desktop-id">io.github.twosharprocks.DriveDesk.desktop</launchable>
   <url type="homepage">https://github.com/twosharprocks/drive-desk</url>
-  <releases><release version="0.5.0" date="2026-11-27"/><release version="0.4.0" date="2026-11-26"/></releases>
+  <releases><release version="0.5.1" date="2026-11-27"/><release version="0.5.0" date="2026-11-27"/><release version="0.4.0" date="2026-11-26"/></releases>
 </component>

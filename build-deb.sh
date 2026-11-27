@@ -18,4 +18,4 @@ install -Dm644 drive-desk.desktop "$stage/usr/share/applications/drive-desk.desk
 install -Dm644 LICENSE "$stage/usr/share/doc/drive-desk/copyright"
 install -Dm644 README.md "$stage/usr/share/doc/drive-desk/README.md"
 install -Dm644 control "$stage/DEBIAN/control"
-dpkg-deb --root-owner-group --build "$stage" "${1:-drive-desk_0.5.0_all.deb}"
+dpkg-deb --root-owner-group --build "$stage" "${1:-drive-desk_0.5.1_all.deb}"
