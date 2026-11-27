@@ -11,6 +11,12 @@ Gio, GLib, Gtk = (app[name] for name in ("Gio", "GLib", "Gtk"))
 
 
 class DriveTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.application = Gtk.Application(flags=Gio.ApplicationFlags.NON_UNIQUE)
+        if not cls.application.register(None):
+            raise RuntimeError("Could not register GTK test application.")
+
     def test_portable_worker_lifetime(self):
         import portable
         import sync
@@ -53,9 +59,7 @@ class DriveTests(unittest.TestCase):
             self.assertEqual(set(folder.iterdir()), {src, dst})
 
     def test_window(self):
-        application = Gtk.Application(application_id=os.getenv("DRIVE_DESK_APP_ID", "org.example.DriveDeskTest"))
-        application.register(None)
-        window = app["Window"](application)
+        window = app["Window"](self.application)
         self.assertIsNotNone(window.client)
         self.assertTrue(window.get_visible())
         self.assertEqual(window.get_title(), "Drive Desk")
@@ -67,6 +71,26 @@ class DriveTests(unittest.TestCase):
             self.assertFalse(window.actions.get_sensitive())
             self.assertIn("Online Accounts", window.status.get_text())
         window.destroy()
+
+    def test_direct_account_without_gnome_files(self):
+        import cloud
+        import oauth
+        ident = "direct:fixture"
+        with mock.patch.object(cloud, "account_manager", side_effect=GLib.Error("Unavailable")), \
+                mock.patch.object(oauth, "accounts", return_value=[(ident, "fixture@example.invalid")]):
+            window = app["Window"](self.application)
+            try:
+                self.assertEqual(window.accounts.get_active_id(), ident)
+                self.assertTrue(window.actions.get_sensitive())
+                self.assertTrue(window.forget_button.get_visible())
+                self.assertTrue(all(not action.get_sensitive() for action in window.mount_actions))
+                with mock.patch.dict(app["Window"].search.__globals__, Search=mock.Mock()) as globals_:
+                    window.search()
+                    globals_["Search"].assert_called_once_with(window, ident)
+                with mock.patch.object(oauth, "token_for", return_value="authorized"):
+                    self.assertEqual(cloud.token_for(ident), "authorized")
+            finally:
+                window.destroy()
 
     def test_search_and_jobs_windows(self):
         import desktop_tools

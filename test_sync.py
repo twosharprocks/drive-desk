@@ -98,6 +98,26 @@ class SyncTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "moved"):
             sync.transfer(job, str(self.remote), os.environ)
 
+    def test_legacy_bisync_listings(self):
+        work = self.base
+        first = work / "desk{old}_folder.path1.lst"
+        second = work / "desk{old}_folder.path2.lst"
+        first.write_bytes(b"remote baseline")
+        with self.assertRaises(ValueError):
+            sync.bisync_workdir(work)
+        second.write_bytes(b"local baseline")
+        lock = work / "desk{old}_folder.lck"
+        lock.touch()
+        with self.assertRaises(ValueError):
+            sync.bisync_workdir(work)
+        lock.unlink()
+        dest = sync.bisync_workdir(work)
+        self.assertEqual((dest / "desk_folder.path1.lst").read_bytes(), first.read_bytes())
+        self.assertEqual((dest / "desk_folder.path2.lst").read_bytes(), second.read_bytes())
+        (dest / "desk_folder.path1.lst").unlink()
+        self.assertEqual(sync.bisync_workdir(work), dest)
+        self.assertFalse((dest / "desk_folder.path1.lst").exists())
+
     def test_duplicate_detection(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             sync.check_unique(['"folder/a,b"', '"folder/a,b"'])
@@ -105,8 +125,8 @@ class SyncTests(unittest.TestCase):
     def test_worker_retries_and_respects_pause(self):
         job = self.job("sync local")
         (self.local / "laptop").write_text("new local file")
-        sync.configure("notifications", "off")
-        with mock.patch.object(sync, "token_for", side_effect=ValueError("offline")):
+        with mock.patch.object(sync, "token_for", side_effect=ValueError("offline")), \
+                mock.patch.object(sync.subprocess, "run", side_effect=FileNotFoundError("notify-send")):
             sync.run()
         def status():
             with sync.database() as db:

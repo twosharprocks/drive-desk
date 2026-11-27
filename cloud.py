@@ -4,6 +4,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode, quote
 from urllib.request import Request, urlopen
 
+import oauth
 from gi.repository import Gio
 
 GOA = "org.gnome.OnlineAccounts"
@@ -26,10 +27,12 @@ def google_accounts(manager):
 
 
 def token_for(account_id):
+    if account_id.startswith(oauth.PREFIX):
+        return oauth.token_for(account_id)
     for ident, _, _, obj in google_accounts(account_manager()):
         if ident == account_id:
-            oauth = obj.get_interface(GOA + ".OAuth2Based")
-            return oauth.call_sync("GetAccessToken", None, Gio.DBusCallFlags.NONE, 60000, None).unpack()[0]
+            proxy = obj.get_interface(GOA + ".OAuth2Based")
+            return proxy.call_sync("GetAccessToken", None, Gio.DBusCallFlags.NONE, 60000, None).unpack()[0]
     raise ValueError("Reconnect this Google account and enable Files in Online Accounts.")
 
 
