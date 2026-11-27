@@ -1,10 +1,10 @@
 # Windows feature inventory and Linux coverage
 
-**26 November 2026 · Drive Desk 0.4.0 · Debian 13 / GNOME**
+**27 November 2026 · Drive Desk 0.4.0 · Linux / GNOME**
 
 This inventory covers publicly documented Windows desktop workflows, settings, Office integration and enterprise controls. The Windows installer previously inspected was Google-signed version 134.0.1.0. Undocumented behavior, rollout-specific UI, and organization-specific entitlements cannot be established from installer inspection. “Implemented” describes a code path. The verification section records where it has actually run.
 
-| Windows capability | Drive Desk 0.2 behavior | Coverage |
+| Windows capability | Drive Desk 0.4.0 behavior | Coverage |
 |---|---|---|
 | Browser sign-in, several accounts (Windows supports four), switch and disconnect | GNOME Online Accounts owns authentication. The selector assigns search and sync to a specific account. Removing access prevents future transfers. | Single-account sign-in and worker authentication verified live |
 | Explorer virtual drive and on-demand open, create, edit, rename, move, copy and delete | Open in Files uses GNOME’s GVfs Google backend. Applications can use the GVfs FUSE bridge. | Delegated; live semantics depend on backend and permissions |
@@ -29,7 +29,7 @@ This inventory covers publicly documented Windows desktop workflows, settings, O
 | Work with .docx, .xlsx and .pptx | Files in a mirror open in the installed Linux office applications. Changes use ordinary file sync. | Implemented at file level |
 | Office real-time presence, safe/wait-to-edit notifications, identify collaborators, get latest and compare versions | Requires compatible Office host integration and a presence service. | Gap |
 | Outlook insert Drive links, check recipient access and save attachments into Drive | Email link opens the configured mail composer. A user can save attachments into a mirror using their mail client. | Partial workflow; Outlook add-in and recipient checks absent |
-| Enterprise deployment, account restrictions, trusted devices, cache limits, certificates, admin-enforced features and branded update delivery | Debian installation and removal are available. Google still authorizes each API call. | Gap in official-client enrollment, policy compatibility, managed updates and client-side-encrypted Workspace workflows |
+| Enterprise deployment, account restrictions, trusted devices, cache limits, certificates, admin-enforced features and branded update delivery | Flatpak, Snap and Debian installers are available. Google still authorizes each API call. | Gap in official-client enrollment, policy compatibility, managed updates and client-side-encrypted Workspace workflows |
 | Diagnostics, feedback and support | Activity displays recent transfer logs; package and source include tests and this inventory. | Partial; no upload to Google support or automatic diagnostic bundle |
 | Google Photos backup and quality selection | Google ended Drive for desktop Photos backup on 10 August 2026. Uploading images to Drive stores ordinary Drive files. | Retired Windows feature |
 
@@ -47,4 +47,8 @@ The platform-specific rows use Google’s [Office and Outlook guide](https://sup
 
 Tests in the Debian 13 VirtualBox guest exercise the packaged Linux dependencies, GTK, local GIO copies and actual rclone transfers between disposable directories. They cover initial replication, offline edit upload, deletion, two-sided conflicts in a folder mirror, selective file pinning, moved pins, backup retention and a replaced local root. API tests check requests using fixtures. Workspace permissions, real Google invitation delivery, Shared drives, high-volume sync, expiring credentials mid-transfer, and USB hardware remain unverified.
 
-A separate live test used a Files-enabled GNOME Google account and one selected Drive folder. Debian verified the Windows seed by SHA-256. With the VM network link down, Linux edited the file. After reconnection, the packaged user service synchronized the edit to the Windows desktop client. A subsequent Windows edit synchronized back to Debian. Both ends matched the expected bytes, including an unchanged control file. These distinctions matter before assigning the app an important Drive.
+A separate live test used a Files-enabled GNOME Google account and one selected Drive folder. Debian verified the Windows seed by SHA-256. With the VM network link down, Linux edited the file. After reconnection, the packaged user service synchronized the edit to the Windows desktop client. A subsequent Windows edit synchronized back to Debian. Both ends matched the expected bytes, including an unchanged control file.
+
+On Fedora 44, all 12 automated tests passed inside the released Flatpak. Google sign-in succeeded in GNOME Online Accounts, but the host exposed no Files interface for that account. The client stopped before registering a job or downloading files. The offline upload and return trip remain unverified on Fedora.
+
+The strict Snap launched and passed automated tests on Ubuntu. Its live Google Drive round trip remains unverified.

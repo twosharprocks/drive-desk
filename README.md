@@ -1,10 +1,24 @@
-# Drive Desk 0.4.0
+# Drive Desk for Linux
 
-An independent MIT-licensed Google Drive client for GNOME on Linux. Use Drive on demand in Files, or keep selected content on disk and synchronize offline edits. GNOME handles sign-in. The background worker uses rclone internally. Setup is graphical.
+Drive Desk is an independent, MIT-licensed Google Drive desktop client for Linux. Keep a selected folder available offline, sync edits between computers, or open Drive on demand in GNOME Files. For a folder of Codex project files, choose **Search Drive → Keep offline** and select that folder. Setup is graphical and Drive Desk runs rclone internally.
 
-**Preview release.** Automated tests cover local transfer behavior. A live test verified a Windows-created file in Debian, an offline Linux edit back on Windows, and a subsequent Windows edit back in Debian using one selected folder.
+## Download Drive Desk 0.4.0 (preview)
 
-[Download the Flatpak, Snap or Debian package and SHA-256 checksums](https://github.com/twosharprocks/drive-desk/releases/tag/v0.4.0).
+| Package | Download | Tested environment |
+|---|---|---|
+| Flatpak (x86-64) | [Download .flatpak](https://github.com/twosharprocks/drive-desk/releases/download/v0.4.0/DriveDesk-0.4.0-x86_64.flatpak) | Fedora 44. All 12 automated tests passed. Live Google sync is blocked on the stock desktop. |
+| Snap (amd64, strict confinement) | [Download .snap](https://github.com/twosharprocks/drive-desk/releases/download/v0.4.0/drive-desk_0.4.0_amd64.snap) | Ubuntu. Package launch and automated tests verified. Live Google sync remains unverified. |
+| Debian package | [Download .deb](https://github.com/twosharprocks/drive-desk/releases/download/v0.4.0/drive-desk_0.4.0_all.deb) | Debian 13 with GNOME. A selected folder synchronized edits in both directions with Google Drive for Windows, including an offline edit. |
+
+[Preview release notes](https://github.com/twosharprocks/drive-desk/releases/tag/v0.4.0) · [SHA-256 checksums](https://github.com/twosharprocks/drive-desk/releases/download/v0.4.0/SHA256SUMS)
+
+**Check your desktop before installing.** All three packages currently need GNOME Online Accounts to offer **Files** for your Google account. On-demand browsing also uses the host’s GVfs Google backend. On stock Fedora 44, Google sign-in succeeded but the account exposed only Mail, Calendar and Contacts. Drive Desk could not start a sync job. Changing package formats on the same host does not supply the missing service. [GNOME discussion](https://discourse.gnome.org/t/google-drive-in-gnome-50/34417/2)
+
+## Development priorities
+
+1. Add **Connect Google Drive** inside the app using browser-based Google authorization. Let search and selected-folder sync work independently of GNOME Files. Keep **Open in Files** available on desktops with the Google backend.
+2. Verify the new connection with the Fedora Flatpak and Ubuntu Snap. The release check should download a Windows-created file, upload an offline Linux edit after reconnection, download a second Windows edit, and verify an untouched control file by checksum.
+3. Make sync problems easier to recover from. Show the affected folder and last successful sync, and give distinct actions for an expired login, an unavailable disk, and a file conflict.
 
 ## Install and connect
 
