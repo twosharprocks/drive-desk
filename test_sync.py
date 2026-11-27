@@ -125,8 +125,8 @@ class SyncTests(unittest.TestCase):
     def test_worker_retries_and_respects_pause(self):
         job = self.job("sync local")
         (self.local / "laptop").write_text("new local file")
-        sync.configure("notifications", "off")
-        with mock.patch.object(sync, "token_for", side_effect=ValueError("offline")):
+        with mock.patch.object(sync, "token_for", side_effect=ValueError("offline")), \
+                mock.patch.object(sync.subprocess, "run", side_effect=FileNotFoundError("notify-send")):
             sync.run()
         def status():
             with sync.database() as db:

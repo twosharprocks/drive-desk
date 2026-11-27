@@ -269,8 +269,9 @@ def run():
             except Exception as exc:
                 status = "Needs attention — " + str(exc)
                 if job["status"] != status and preference("notifications", "on") == "on":
-                    subprocess.run(["notify-send", "Drive Desk", "A folder needs attention. Open Scheduled folders."],
-                                   check=False)
+                    with contextlib.suppress(OSError, subprocess.TimeoutExpired):
+                        subprocess.run(["notify-send", "Drive Desk", "A folder needs attention. Open Scheduled folders."],
+                                       check=False, timeout=5)
             with database() as db:
                 record_result(db, job, status)
 

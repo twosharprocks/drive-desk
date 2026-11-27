@@ -1,9 +1,9 @@
 name: drive-desk
 base: core24
-version: '0.4.0'
+version: '0.5.0'
 summary: Open Google Drive and synchronize selected folders on GNOME
 description: |
-  Drive Desk uses your GNOME Online Accounts login to access Google Drive.
+  Connect directly to Google Drive with a desktop OAuth client or use GNOME Online Accounts.
   Select individual folders for offline editing, search Drive, and manage sync jobs.
 grade: devel
 confinement: strict

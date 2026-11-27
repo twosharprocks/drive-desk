@@ -1,6 +1,6 @@
 # Build the Linux installers
 
-Run these commands from the root of a clean Drive Desk checkout. Both portable packages target x86-64. The host GNOME account service handles credentials, and Drive Desk contacts it over the session bus.
+Run these commands from the root of a clean Drive Desk checkout. Both portable packages target x86-64. Direct sign-in uses the user’s Google Desktop app OAuth client. GNOME account integration is also available. Build from tracked release sources and keep personal OAuth files outside the source tree.
 
 ## Flatpak
 
@@ -12,12 +12,12 @@ flatpak install --user flathub org.gnome.Platform//50 org.gnome.Sdk//50
 flatpak-builder --user --disable-rofiles-fuse --default-branch=stable --force-clean \
   --repo=flatpak-repo flatpak-build io.github.twosharprocks.DriveDesk.json
 flatpak build-bundle --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo \
-  flatpak-repo DriveDesk-0.4.0-x86_64.flatpak io.github.twosharprocks.DriveDesk stable
+  flatpak-repo DriveDesk-0.5.0-x86_64.flatpak io.github.twosharprocks.DriveDesk stable
 ```
 
 ## Snap
 
-Install Snapcraft, then run `snapcraft pack` in an environment with a supported build provider. The recipe targets Ubuntu core24 and uses the GNOME extension. For a dedicated, disposable Ubuntu 24.04 build VM, `sudo snapcraft pack --destructive-mode` uses the VM directly. The build outputs `drive-desk_0.4.0_amd64.snap`. Snapcraft stages rclone from the Ubuntu archive.
+Install Snapcraft, then run `snapcraft pack` in an environment with a supported build provider. The recipe targets Ubuntu core24 and uses the GNOME extension. For a dedicated, disposable Ubuntu 24.04 build VM, `sudo snapcraft pack --destructive-mode` uses the VM directly. The build outputs `drive-desk_0.5.0_amd64.snap`. Snapcraft stages rclone from the Ubuntu archive.
 
 ## Desktop integration
 

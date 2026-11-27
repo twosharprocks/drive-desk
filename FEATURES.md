@@ -1,12 +1,12 @@
 # Windows feature inventory and Linux coverage
 
-**27 November 2026 · Drive Desk 0.4.0 · Linux / GNOME**
+**27 November 2026 · Drive Desk 0.5.0 · Linux / GNOME**
 
 This inventory covers publicly documented Windows desktop workflows, settings, Office integration and enterprise controls. The Windows installer previously inspected was Google-signed version 134.0.1.0. Undocumented behavior, rollout-specific UI, and organization-specific entitlements cannot be established from installer inspection. “Implemented” describes a code path. The verification section records where it has actually run.
 
-| Windows capability | Drive Desk 0.4.0 behavior | Coverage |
+| Windows capability | Drive Desk 0.5.0 behavior | Coverage |
 |---|---|---|
-| Browser sign-in, several accounts (Windows supports four), switch and disconnect | GNOME Online Accounts owns authentication. The selector assigns search and sync to a specific account. Removing access prevents future transfers. | Single-account sign-in and worker authentication verified live |
+| Browser sign-in, several accounts (Windows supports four), switch and disconnect | Choose direct desktop OAuth or GNOME Online Accounts. The selector assigns search and sync to a specific account. Removing access prevents future transfers. | Single-account sign-in and worker authentication verified live |
 | Explorer virtual drive and on-demand open, create, edit, rename, move, copy and delete | Open in Files uses GNOME’s GVfs Google backend. Applications can use the GVfs FUSE bridge. | Delegated; live semantics depend on backend and permissions |
 | Drive letter or custom streamed folder | Link to folder creates a Linux filesystem shortcut to the active mount. | Partial; GNOME chooses the mount path |
 | My Drive, Shared drives, Other computers and backed-up devices | Search includes accessible shared-drive items. Folder jobs carry the shared-drive ID. Files shows the collections exposed by GVfs. Local folder sync creates a named folder in My Drive. | Partial; Google’s Computers namespace and device identities unavailable here |
@@ -53,7 +53,7 @@ On Fedora 44, all 12 automated tests passed inside the released Flatpak. Google 
 
 The released 0.4.0 strict Snap launched and passed automated tests on Ubuntu. The live Ubuntu result below applies to the direct-login development build.
 
-### Direct Google connection development build
+### Live checks during the 0.5.0 development cycle
 
 On 27 November 2026 the Fedora 44 development Flatpak completed a live round trip with Google Drive for Windows. After browser consent, the test registered one disposable folder using the packaged sync code and invoked the packaged worker for each transfer. Fedora downloaded both Windows seed files. With the VM network link down, Fedora edited one file. After reconnection Windows received the edit, then Fedora received a subsequent Windows edit. SHA-256 matched on both systems, including the unchanged control file. This first test used manual worker invocation with a fresh direct authorization.
 

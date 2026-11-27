@@ -57,6 +57,8 @@ def exchange(fields):
         with urlopen(req, timeout=25) as response:
             return json.load(response)
     except HTTPError as exc:
+        if exc.code == 429 or 500 <= exc.code < 600:
+            raise ValueError(f"Google authorization temporarily unavailable (HTTP {exc.code}). Try again later.") from None
         raise ValueError(f"Google declined the token request (HTTP {exc.code}). Reconnect Google Drive.") from None
 
 

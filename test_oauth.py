@@ -57,6 +57,13 @@ class DirectConnectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Reconnect"):
             oauth.token_for(ident)
 
+    def test_temporary_token_service_failure(self):
+        for code in (429, 503):
+            with self.subTest(code=code), patch.object(oauth, "urlopen", side_effect=HTTPError(
+                    "https://oauth2.googleapis.com/token", code, "Temporary error", {}, None)):
+                with self.assertRaisesRegex(ValueError, "Try again later"):
+                    oauth.exchange({"grant_type": "refresh_token"})
+
     def test_denial_saves_nothing(self):
         with self.assertRaisesRegex(ValueError, "declined"), patch.object(oauth, "exchange") as exchange:
             oauth.connect(self.client, lambda url: self.browser(url, True), lambda: False, lambda _: self.user)
