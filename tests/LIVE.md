@@ -42,7 +42,7 @@ On Fedora 44, the released Flatpak (rclone 1.76.0) began its throttled upload wi
 
 On Ubuntu 24.04.5, the strict Snap (rclone 1.60.1-DEV) started with 144 seconds remaining. While the worker was running, the original token returned HTTP 200 with four matching files already on Drive, then HTTP 401 ten seconds after expiry. The worker stopped with **Needs attention**. A fresh token returned HTTP 200 and showed ten uploaded files, all with matching MD5 checksums. Windows also showed ten files. An ordinary retry reported missing prior bisync listings and left the same ten files on Drive. All 32 local checksums matched. Both test jobs were paused after verification.
 
-The open bug tracks safe renewal or recovery for established two-way mirrors. [Issue #2](https://github.com/twosharprocks/drive-desk/issues/2)
+The 0.5.0 failure was reported in the issue tracker. [Issue #2](https://github.com/twosharprocks/drive-desk/issues/2)
 
 ### Repeating the long-transfer check
 
@@ -50,3 +50,13 @@ The open bug tracks safe renewal or recovery for established two-way mirrors. [I
 2. Generate 32 distinct 256 KiB files locally and record their MD5 digests. Set the job’s upload limit to 16 KiB/s. Use the real expiry recorded for the direct Google account. Start the installed worker about 145 seconds before expiry so it uses the current token and the queue takes longer than its remaining lifetime.
 3. In the test harness, keep the original token in memory. Query Drive with it before expiry and again while the worker is running after expiry. Record only the HTTP status, job state and number of uploaded files. A cached expiry timestamp alone cannot establish when Google stopped accepting the token.
 4. Record the first worker result. Obtain a fresh token through the installed client and compare the remote names and MD5 checksums with the local manifest. Remove the test bandwidth limit and run the worker normally once more. Record its status and repeat the checks on both sides. Preserve both copies and the sync listings if the worker requests recovery. Pause the test job when finished.
+
+## 0.5.1 direct-connection upload across token expiry
+
+The release test used the installed package, an initialized disposable two-way mirror, and 32 distinct 256 KiB files with recorded checksums (8 MiB total). Upload was limited to 12 KiB/s. Each worker started about seven minutes before the original token's natural expiry. The test retained that token in memory for independent probes. It did not change the system clock, edit the cached expiry, force a resync, or request new consent.
+
+On Ubuntu 24.04.5, the strict Snap started with 419 seconds remaining. Google accepted the original token when 16 files were on Drive. Ten seconds after expiry Google rejected it with HTTP 401 while the worker was still running. The first run reported **Up to date**. Google accepted the renewed token, and all 32 remote names and MD5 checksums matched. A normal follow-up run preserved all 32 files. The Windows Drive client independently matched all 32 Linux SHA-256 digests.
+
+On Fedora 44, the stable Flatpak started with 392 seconds remaining. Google accepted the original token when 13 files were on Drive and returned HTTP 401 while the worker was still running after expiry. The first run reported **Up to date**. The renewed token returned HTTP 200, all 32 remote names and MD5 checksums matched, and a normal follow-up run preserved the mirror. Windows also matched all 32 Fedora SHA-256 digests. Both test profiles retained the original local payloads and paused their disposable jobs afterward.
+
+An earlier, unpublished candidate refreshed the token close to expiry. On Fedora it uploaded 31 files, but an outstanding request received HTTP 401. The final worker asks for renewal five minutes early on each cycle to give in-flight requests time to complete. The Google refresh grant stays in Drive Desk's account database. These tests cover direct Google connections and healthy, initialized mirrors. A mirror whose prior listings were already invalidated by 0.5.0 still needs the recovery procedure in the README.

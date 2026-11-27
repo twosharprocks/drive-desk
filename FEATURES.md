@@ -1,10 +1,10 @@
 # Windows feature inventory and Linux coverage
 
-**27 November 2026 · Drive Desk 0.5.0 · Linux / GNOME**
+**27 November 2026 · Drive Desk 0.5.1 · Linux / GNOME**
 
 This inventory covers publicly documented Windows desktop workflows, settings, Office integration and enterprise controls. The Windows installer previously inspected was Google-signed version 134.0.1.0. Undocumented behavior, rollout-specific UI, and organization-specific entitlements cannot be established from installer inspection. “Implemented” describes a code path. The verification section records where it has actually run.
 
-| Windows capability | Drive Desk 0.5.0 behavior | Coverage |
+| Windows capability | Drive Desk 0.5.1 behavior | Coverage |
 |---|---|---|
 | Browser sign-in, several accounts (Windows supports four), switch and disconnect | Choose direct desktop OAuth or GNOME Online Accounts. The selector assigns search and sync to a specific account. Removing access prevents future transfers. | Single-account sign-in and worker authentication verified live |
 | Explorer virtual drive and on-demand open, create, edit, rename, move, copy and delete | Open in Files uses GNOME’s GVfs Google backend. Applications can use the GVfs FUSE bridge. | Delegated; live semantics depend on backend and permissions |
@@ -66,3 +66,5 @@ A subsequent Ubuntu Snap scheduler check exposed a compatibility issue. After a 
 The rebuilt strict Snap passed all 16 automated tests. With the existing mirror and its pending edit intact, the check marked the cached token due again and cold-started the Snap with `--background` on Ubuntu 24.04.5 LTS using a virtual display. The stored expiry advanced, the job reported **Up to date**, and Windows received the pending Ubuntu edit. A subsequent scheduled cycle downloaded a Windows edit without a manual worker invocation. The edited file and untouched control matched by SHA-256 on both machines. This verified pre-transfer token renewal and recurring transfers.
 
 The released 0.5.0 Flatpak and Snap both uploaded a pending file after a fresh desktop sign-in. Both stopped with **Needs attention** when Google rejected an expired token during a two-way upload. Each preserved all local test files, but the partial mirror required recovery after a normal retry. [Live results and reproduction steps](tests/LIVE.md) · [Issue #2](https://github.com/twosharprocks/drive-desk/issues/2)
+
+In 0.5.1, the installed Fedora 44 Flatpak and Ubuntu 24.04.5 strict Snap each completed the same 32-file direct-connection upload across natural token expiry. All remote checksums matched on the first run, and a subsequent sync preserved the mirror. Mid-transfer renewal via GNOME Online Accounts remains unverified. [Test conditions and results](tests/LIVE.md)

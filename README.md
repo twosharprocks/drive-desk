@@ -4,15 +4,15 @@ Drive Desk is an independent, MIT-licensed Google Drive desktop client for Linux
 
 **Project status:** Maintenance is paused. The MIT-licensed source, build instructions and preview installers are public. There is no scheduled support or release cycle.
 
-## Download Drive Desk 0.5.0 (preview)
+## Download Drive Desk 0.5.1 (preview)
 
 | Package | Download | Tested environment |
 |---|---|---|
-| Flatpak (x86-64) | [Download .flatpak](https://github.com/twosharprocks/drive-desk/releases/download/v0.5.0/DriveDesk-0.5.0-x86_64.flatpak) | Fedora 44. Direct sign-in, offline edits, unattended sync and token renewal verified in the 0.5 development cycle. |
-| Snap (amd64, strict confinement) | [Download .snap](https://github.com/twosharprocks/drive-desk/releases/download/v0.5.0/drive-desk_0.5.0_amd64.snap) | Ubuntu 24.04.5. Direct sign-in, offline edits, unattended sync and token renewal verified in the 0.5 development cycle. |
-| Debian package | [Download .deb](https://github.com/twosharprocks/drive-desk/releases/download/v0.5.0/drive-desk_0.5.0_all.deb) | Debian 13 with GNOME. The GNOME connection previously passed a live selected-folder round trip with Windows. |
+| Flatpak (x86-64) | [Download .flatpak](https://github.com/twosharprocks/drive-desk/releases/download/v0.5.1/DriveDesk-0.5.1-x86_64.flatpak) | Fedora 44. Direct sign-in, offline edits, unattended sync and token renewal verified in the 0.5 development cycle. |
+| Snap (amd64, strict confinement) | [Download .snap](https://github.com/twosharprocks/drive-desk/releases/download/v0.5.1/drive-desk_0.5.1_amd64.snap) | Ubuntu 24.04.5. Direct sign-in, offline edits, unattended sync and token renewal verified in the 0.5 development cycle. |
+| Debian package | [Download .deb](https://github.com/twosharprocks/drive-desk/releases/download/v0.5.1/drive-desk_0.5.1_all.deb) | Debian 13 with GNOME. The GNOME connection previously passed a live selected-folder round trip with Windows. |
 
-[Preview release notes](https://github.com/twosharprocks/drive-desk/releases/tag/v0.5.0) · [SHA-256 checksums](https://github.com/twosharprocks/drive-desk/releases/download/v0.5.0/SHA256SUMS)
+[Preview release notes](https://github.com/twosharprocks/drive-desk/releases/tag/v0.5.1) · [SHA-256 checksums](https://github.com/twosharprocks/drive-desk/releases/download/v0.5.1/SHA256SUMS)
 
 ## Connect directly to Google Drive
 
@@ -26,7 +26,7 @@ The selected account appears with **(direct)** in its name. Search and the sched
 
 The Fedora Flatpak and Ubuntu Snap completed live round trips with Google Drive for Windows using one disposable folder. Both renewed a Google token at the start of a background run. The released 0.5.0 packages also started automatically after desktop sign-in and uploaded a pending file whose SHA-256 matched on Windows.
 
-**Known limitation in 0.5.0.** When the token expired during a throttled two-way upload, both packages stopped partway through and an ordinary retry could not resume. All 32 local files remained intact in each test. See **Operations and recovery** below before reconnecting an affected mirror. [Open issue](https://github.com/twosharprocks/drive-desk/issues/2) · [Test procedure](tests/LIVE.md) · [Feature coverage and verification history](FEATURES.md)
+In 0.5.1, the Fedora Flatpak and Ubuntu strict Snap each uploaded 32 of 32 files on the first run while the original Google token expired. The renewed direct connection kept the mirror up to date, and every remote checksum matched. If a mirror already reported missing sync listings in 0.5.0, pause the job and preserve both copies before following **Operations and recovery**. [Issue #2](https://github.com/twosharprocks/drive-desk/issues/2) · [Test procedure](tests/LIVE.md) · [Feature coverage and verification history](FEATURES.md)
 
 ## Install and connect
 
@@ -36,7 +36,7 @@ Choose one format. The portable downloads target x86-64 Linux desktops. On-deman
 
 ```sh
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install --user ./DriveDesk-0.5.0-x86_64.flatpak
+flatpak install --user ./DriveDesk-0.5.1-x86_64.flatpak
 flatpak run io.github.twosharprocks.DriveDesk//stable
 ```
 
@@ -45,13 +45,13 @@ Flathub supplies the GNOME 50 runtime. The Drive Desk installer comes from GitHu
 **Snap** (with snapd installed):
 
 ```sh
-sudo snap install --dangerous ./drive-desk_0.5.0_amd64.snap
+sudo snap install --dangerous ./drive-desk_0.5.1_amd64.snap
 snap run drive-desk
 ```
 
 The local installer uses strict confinement. Snap calls its local installation flag `--dangerous` because the GitHub download has no Snap Store assertion. For a GNOME Google login, also run `sudo snap connect drive-desk:accounts-service`. For external disks, also run `sudo snap connect drive-desk:removable-media`. The first install may download shared GNOME content snaps.
 
-**Debian 13**: Open `drive-desk_0.5.0_all.deb` in your package installer or run `sudo apt install ./drive-desk_0.5.0_all.deb`. Close any open Drive Desk window before upgrading.
+**Debian 13**: Open `drive-desk_0.5.1_all.deb` in your package installer or run `sudo apt install ./drive-desk_0.5.1_all.deb`. Close any open Drive Desk window before upgrading.
 
 ### Connect through GNOME Online Accounts
 
@@ -81,7 +81,7 @@ The main window shows the selected account’s scheduled-folder status and unrea
 
 ## Operations and recovery
 
-Open **Scheduled folders → Activity** to inspect the last two run logs. **Storage** shows local folder usage, free disk space and Google account usage when accessible. Jobs, sync listings and logs are stored in `$XDG_STATE_HOME/drive-desk` (default `~/.local/state/drive-desk`). The worker obtains an access token for the selected account and supplies it in a private, temporary rclone configuration. A stable remote name lets existing mirrors retain their sync history when the token changes. The scheduler can renew a token before starting a run. If it expires during a two-way transfer, the job can stop with **Needs attention** after uploading only some files. A fresh token on the next run may leave rclone unable to find valid sync listings. Pause an affected job and preserve both copies before recovery.
+Open **Scheduled folders → Activity** to inspect the last two run logs. **Storage** shows local folder usage, free disk space and Google account usage when accessible. Jobs, sync listings and logs are stored in `$XDG_STATE_HOME/drive-desk` (default `~/.local/state/drive-desk`). For direct Google connections, rclone gets the current access token and a temporary, per-job key in an owner-only configuration. When a token approaches expiry, rclone uses the key to request another token from Drive Desk over the loopback interface. Drive Desk renews the Google grant and saves it in the account database. The worker allows five minutes for outstanding requests to finish with the old token. The loopback listener and temporary configuration last only for the job. The stable remote name preserves the mirror's sync history across renewals. GNOME Online Accounts supplies a session access token and manages its own grant. Mid-transfer renewal with that connection is unverified.
 
 If a job reports a missing marker, disconnected disk, duplicate name or invalid baseline, preserve the local folder and inspect Activity. Reconnect the original disk or resolve duplicate names on Drive where applicable. If the sync engine requires a fresh baseline, pause the job, keep the existing tree, disconnect, and create a fresh mirror in a separate empty folder. Compare and recover any offline-only files before removing old data. Drive Desk never automatically forces a resync of an established mirror.
 
